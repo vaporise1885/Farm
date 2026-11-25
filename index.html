@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Farming Tracker</title>
+  <meta name="description" content="Log the items you farm in game and keep a running history.">
+  <style>
+    :root {
+      --bg: #f4f6f8; --panel: #ffffff; --text: #1f2328; --muted: #5f6b76;
+      --accent: #2f8f4e; --accent-text: #ffffff; --border: #d8dee4; --danger: #c0392b;
+      --row: #f8fafb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1419; --panel: #171d24; --text: #e6edf3; --muted: #95a1ad;
+        --accent: #46b46a; --accent-text: #0b130e; --border: #2b343e; --danger: #ef6b5b;
+        --row: #1b222a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5;
+    }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { margin: 0 0 4px; font-size: 1.8rem; }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px; margin-bottom: 20px;
+    }
+    h2 { font-size: 1.15rem; margin: 0 0 14px; }
+    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+    input, select {
+      font: inherit; color: var(--text); background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; width: 100%;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button {
+      font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 9px 14px;
+      border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    }
+    button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    button.danger { color: var(--danger); }
+    button.link { border: none; background: none; padding: 2px 6px; color: var(--danger); font-weight: 500; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .stat .n { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat .l { color: var(--muted); font-size: 0.85rem; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+    .toolbar input { max-width: 260px; }
+    .spacer { flex: 1; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.notes { white-space: normal; min-width: 160px; color: var(--muted); }
+    tbody tr:nth-child(even) { background: var(--row); }
+    .empty { color: var(--muted); text-align: center; padding: 24px; }
+    .note { color: var(--muted); font-size: 0.85rem; margin: 10px 0 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 820px) { .grid2 { grid-template-columns: 1fr 2fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Farming Tracker</h1>
+    <p class="sub">Log what you farm and keep a running history. Everything saves automatically in this browser.</p>
+
+    <div class="panel">
+      <h2>Add a drop</h2>
+      <form id="entryForm" autocomplete="off">
+        <label>Date
+          <input type="date" id="date" required>
+        </label>
+        <label>Item
+          <input type="text" id="item" list="itemList" placeholder="e.g. Iron Ore" required>
+          <datalist id="itemList"></datalist>
+        </label>
+        <label>Quantity
+          <input type="number" id="qty" min="1" step="1" value="1" required>
+        </label>
+        <label>Location / map
+          <input type="text" id="location" list="locList" placeholder="optional">
+          <datalist id="locList"></datalist>
+        </label>
+        <label>Notes
+          <input type="text" id="notes" placeholder="optional">
+        </label>
+        <button type="submit" class="primary">Add</button>
+      </form>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="n" id="statEntries">0</div><div class="l">Entries logged</div></div>
+      <div class="stat"><div class="n" id="statItems">0</div><div class="l">Total items farmed</div></div>
+      <div class="stat"><div class="n" id="statUnique">0</div><div class="l">Different items</div></div>
+      <div class="stat"><div class="n" id="statToday">0</div><div class="l">Items today</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>Totals by item</h2>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Item</th><th class="num">Total</th><th class="num">Entries</th></tr></thead>
+            <tbody id="totalsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>History</h2>
+        <div class="toolbar">
+          <input type="search" id="search" placeholder="Search item, location, notes">
+          <select id="range" aria-label="Date range">
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Location</th><th>Notes</th><th></th></tr></thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Backup</h2>
+      <div class="toolbar">
+        <button type="button" id="exportBtn">Export backup (.json)</button>
+        <button type="button" id="importBtn">Import backup</button>
+        <button type="button" id="csvBtn">Export CSV</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+        <span class="spacer"></span>
+        <button type="button" id="clearBtn" class="danger">Clear all history</button>
+      </div>
+      <p class="note">Your history is stored only in this browser on this device. Clearing browser data or switching devices will not carry it over, so export a backup now and then. Import a backup to restore it or move it to another device.</p>
+    </div>
+  </div>
+
+  <script>
+    const KEY = 'farmingTracker.v1';
+    let entries = load();
+
+    function load() {
+      try { return JSON.parse(localStorage.getItem(KEY)) || []; }
+      catch (e) { return []; }
+    }
+    function save() {
+      try { localStorage.setItem(KEY, JSON.stringify(entries)); }
+      catch (e) { alert('Could not save. Your browser may be blocking storage.'); }
+    }
+    const $ = id => document.getElementById(id);
+    const todayStr = () => {
+      const d = new Date();
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    };
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmt = n => n.toLocaleString();
+
+    $('date').value = todayStr();
+
+    $('entryForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const item = $('item').value.trim();
+      const qty = parseInt($('qty').value, 10);
+      if (!item || !(qty > 0)) return;
+      entries.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        date: $('date').value || todayStr(),
+        item, qty,
+        location: $('location').value.trim(),
+        notes: $('notes').value.trim(),
+        created: Date.now()
+      });
+      save();
+      $('item').value = ''; $('qty').value = 1; $('notes').value = '';
+      $('item').focus();
+      render();
+    });
+
+    function inRange(dateStr, range) {
+      if (range === 'all') return true;
+      const today = todayStr();
+      if (range === 'today') return dateStr === today;
+      const cutoff = new Date(today);
+      cutoff.setDate(cutoff.getDate() - (parseInt(range, 10) - 1));
+      return new Date(dateStr) >= cutoff;
+    }
+
+    function render() {
+      const q = $('search').value.trim().toLowerCase();
+      const range = $('range').value;
+      const filtered = entries
+        .filter(e => inRange(e.date, range))
+        .filter(e => !q || [e.item, e.location, e.notes].join(' ').toLowerCase().includes(q))
+        .sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
+
+      $('historyBody').innerHTML = filtered.length ? filtered.map(e => `
+        <tr>
+          <td>${esc(e.date)}</td>
+          <td>${esc(e.item)}</td>
+          <td class="num">${fmt(e.qty)}</td>
+          <td>${esc(e.location)}</td>
+          <td class="notes">${esc(e.notes)}</td>
+          <td><button class="link" data-del="${esc(e.id)}" title="Delete entry">Delete</button></td>
+        </tr>`).join('') : `<tr><td colspan="6" class="empty">No entries yet. Add your first drop above.</td></tr>`;
+
+      const totals = {};
+      filtered.forEach(e => {
+        const k = e.item;
+        totals[k] = totals[k] || { qty: 0, count: 0 };
+        totals[k].qty += e.qty; totals[k].count++;
+      });
+      const rows = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty);
+      $('totalsBody').innerHTML = rows.length ? rows.map(([k, v]) => `
+        <tr><td>${esc(k)}</td><td class="num">${fmt(v.qty)}</td><td class="num">${fmt(v.count)}</td></tr>`).join('')
+        : `<tr><td colspan="3" class="empty">Nothing to total yet.</td></tr>`;
+
+      $('statEntries').textContent = fmt(filtered.length);
+      $('statItems').textContent = fmt(filtered.reduce((s, e) => s + e.qty, 0));
+      $('statUnique').textContent = fmt(rows.length);
+      const t = todayStr();
+      $('statToday').textContent = fmt(entries.filter(e => e.date === t).reduce((s, e) => s + e.qty, 0));
+
+      const uniq = (key) => [...new Set(entries.map(e => e[key]).filter(Boolean))].sort();
+      $('itemList').innerHTML = uniq('item').map(v => `<option value="${esc(v)}">`).join('');
+      $('locList').innerHTML = uniq('location').map(v => `<option value="${esc(v)}">`).join('');
+    }
+
+    $('historyBody').addEventListener('click', e => {
+      const id = e.target.dataset.del;
+      if (!id) return;
+      if (!confirm('Delete this entry?')) return;
+      entries = entries.filter(x => x.id !== id);
+      save(); render();
+    });
+
+    $('search').addEventListener('input', render);
+    $('range').addEventListener('change', render);
+
+    function download(name, text, type) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type }));
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    $('exportBtn').addEventListener('click', () => {
+      download(`farming-backup-${todayStr()}.json`, JSON.stringify(entries, null, 2), 'application/json');
+    });
+
+    $('csvBtn').addEventListener('click', () => {
+      const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const lines = [['Date', 'Item', 'Quantity', 'Location', 'Notes'].join(',')]
+        .concat(entries.map(e => [e.date, e.item, e.qty, e.location, e.notes].map(cell).join(',')));
+      download(`farming-history-${todayStr()}.csv`, lines.join('\n'), 'text/csv');
+    });
+
+    $('importBtn').addEventListener('click', () => $('importFile').click());
+    $('importFile').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (!Array.isArray(data)) throw new Error('bad format');
+        const valid = data.filter(x => x && x.item && x.date && Number(x.qty) > 0)
+          .map(x => ({ ...x, qty: Number(x.qty), id: x.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6), created: x.created || Date.now() }));
+        const ids = new Set(entries.map(x => x.id));
+        const added = valid.filter(x => !ids.has(x.id));
+        entries = entries.concat(added);
+        save(); render();
+        alert(`Imported ${added.length} new entr${added.length === 1 ? 'y' : 'ies'}.`);
+      } catch (err) {
+        alert('That file is not a valid Farming Tracker backup.');
+      }
+      e.target.value = '';
+    });
+
+    $('clearBtn').addEventListener('click', () => {
+      if (!entries.length) return;
+      if (!confirm('Delete ALL history? Export a backup first if you want to keep it.')) return;
+      entries = []; save(); render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
