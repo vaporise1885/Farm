@@ -50,7 +50,7 @@
 
     /* ---- Main ---- */
     main { flex: 1; min-width: 0; }
-    .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 20px 48px; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; }
     h1 { margin: 0 0 4px; font-size: 1.7rem; }
     .sub { color: var(--muted); margin: 0 0 22px; }
     .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
@@ -160,12 +160,16 @@
     .drop-total-wrap [data-submit] { margin-left: auto; }
     tr.run-row { cursor: pointer; }
     .tot-list th.yl-div, .tot-list td.yl-div { border-left: 2px solid var(--hl-border); padding-left: 14px; }
-    .tot-list.craft-totals th { white-space: normal; width: 112px; vertical-align: bottom; padding-left: 12px; }
-    .tot-list.craft-totals td.num { padding-left: 12px; }
+    .tot-list.craft-totals th, .tot-list.craft-totals th.wrap-th { white-space: nowrap; width: auto; vertical-align: bottom; padding-left: 40px; }
+    .tot-list.craft-totals td.num { padding-left: 40px; }
     /* The Farming table's 7th-column divider does not apply to the Crafting totals. */
     .tot-list.craft-totals th:nth-child(7), .tot-list.craft-totals td:nth-child(7) { border-left: none; text-align: right; }
+    tr.loc-row { cursor: pointer; }
+    tr.loc-detail td:first-child { padding-left: 24px; color: var(--muted); }
     tr.craft-detail td:first-child { padding-left: 24px; color: var(--muted); }
     .muted-count { color: var(--muted); font-size: 0.85em; }
+    th.nw-th { white-space: nowrap; vertical-align: bottom; padding-left: 40px; }
+    th.nw-th.farm-th { padding-left: 14px; }
     th.wrap-th { white-space: normal; width: 100px; vertical-align: bottom; }
     .tot-list.craft-totals { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); }
     .tot-list tr.calc-total td { border-top: 1px solid var(--border); padding-top: 6px; }
@@ -181,7 +185,7 @@
     .tot-list th { text-align: left; color: var(--muted); font-size: 0.85rem; font-weight: 700; padding: 0 10px 6px 0; border: none; background: transparent; }
     .tot-list th.num { text-align: right; padding-left: 18px; }
     .tot-list td.tot-ws { vertical-align: middle; text-align: center; font-size: 1.1rem; }
-    .tot-list th:nth-child(7) { text-align: center; }
+    .tot-list th:nth-child(7), .tot-list th:nth-child(8) { text-align: center; }
     /* Yellow divider between White Scroll and Total White Scroll. */
     .tot-list th:nth-child(7), .tot-list td:nth-child(7) { border-left: 2px solid var(--hl-border); }
     button.minus-btn { color: var(--danger); font-size: 1.25rem; line-height: 1; padding: 2px 10px; font-weight: 600; }
@@ -493,7 +497,9 @@
         { id: 'item', label: 'Item', type: 'drops' },
         { id: 'qty', label: 'Quantity', type: 'number' },
         { id: 'character', label: 'Character', placeholder: 'e.g. Main', suggest: true, dropLine: true },
-        { id: 'location', label: 'Location / map', type: 'select', top: true }
+        { id: 'location', label: 'Location / map', type: 'select', top: true },
+        { id: 'duration', label: 'Duration', type: 'select', top: true,
+          options: ['30mn', '45mn', '1h', '1h 15mn', '1h 30mn', '1h 45mn', '2h', '2h 15mn', '2h 30mn', '2h 45mn'] }
       ]
     },
     crafting: {
@@ -512,6 +518,7 @@
   };
 
   const $ = id => document.getElementById(id);
+  const lastPick = {};
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = n => n.toLocaleString();
   // Dates are stored as YYYY-MM-DD (so they sort correctly) and shown as DD/MM/YYYY.
@@ -687,7 +694,7 @@
     const fieldHtml = f => f.type === 'drops' ? '' : f.type === 'count'
       ? `<label>${esc(f.label)}<input type="number" id="f-${f.id}" min="0" step="any" placeholder="0"></label>`
       : f.type === 'select'
-      ? `<label>${esc(f.label)}<select id="f-${f.id}"></select></label>`
+      ? `<label>${esc(f.label)}<select id="f-${f.id}">${(f.options || []).map(o => `<option value="${esc(o)}"${o === lastPick[f.id] ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
       : f.type === 'number'
       ? `<label>${esc(f.label)}<input type="number" id="f-${f.id}" min="1" step="1" value="1" required></label>`
       : `<label>${esc(f.label)}<input type="text" id="f-${f.id}" placeholder="${esc(f.placeholder || '')}" ${f.required ? 'required' : ''} ${f.suggest ? `list="dl-${f.id}"` : ''}>${f.suggest ? `<datalist id="dl-${f.id}"></datalist>` : ''}</label>`;
@@ -713,7 +720,7 @@
     if (current === 'crafting') $('historyHead').innerHTML = `<tr><th>Item</th>${CRAFT_TOTAL_HEADS}<th></th></tr>`;
     if (current === 'farming') {
       // Farming history: one row per run.
-      $('historyHead').innerHTML = `<tr><th>Date</th><th>Location / map</th><th class="num">Characters</th><th class="num">White Scroll (Then)</th><th class="num">White Scroll (Now)</th><th></th></tr>`;
+      $('historyHead').innerHTML = `<tr><th>Location / map</th><th>Duration</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th><th></th></tr>`;
       $('search').placeholder = 'Search location, character or item';
     }
     $('statValueBox').hidden = current !== 'farming';
@@ -1417,14 +1424,11 @@
     const [mesosNow, wsNow] = pair(p ? (tiersOf(p).Advanced ?? null) : null, latestPrice('White Scroll'));
     return { ore, adv, perOre: ore ? adv / ore : null, mesosThen, wsThen, mesosNow, wsNow };
   }
-  const CRAFT_TOTAL_HEADS = `<th class="wrap-th num">Ores used</th><th class="wrap-th num">Total Advanced</th><th class="wrap-th num">Average Craft</th>
-    <th class="wrap-th num yl-div">Total Mesos (Then)</th><th class="wrap-th num">Total White Scroll (Then)</th>
-    <th class="wrap-th num yl-div">Total Mesos (Now)</th><th class="wrap-th num">Total White Scroll (Now)</th>`;
+  const CRAFT_TOTAL_HEADS = `<th class="nw-th num">Ores used</th><th class="nw-th num">Total Advanced</th><th class="nw-th num">Average Craft</th>
+    <th class="nw-th num yl-div">White Scroll (Then)</th><th class="nw-th num yl-div">White Scroll (Now)</th>`;
   const craftTotalCells = t => {
-    const m = v => v == null ? '&mdash;' : fmtMoney(v);
     return `<td class="num">${fmt(t.ore)}</td><td class="num">${fmtRate(t.adv)}</td><td class="num">${t.perOre == null ? '&mdash;' : fmtRate(t.perOre)}</td>
-      <td class="num yl-div">${m(t.mesosThen)}</td><td class="num">${fmtWs(t.wsThen)}</td>
-      <td class="num yl-div">${m(t.mesosNow)}</td><td class="num">${fmtWs(t.wsNow)}</td>`;
+      <td class="num yl-div">${fmtWs(t.wsThen)}</td><td class="num yl-div">${fmtWs(t.wsNow)}</td>`;
   };
   // Crafting history: one row per item; click it to see that item's crafts by date.
   // Item row: Ores used and Total Advanced are sums over all its crafts; Advanced Per Ore = Total Advanced / Ores used;
@@ -1453,7 +1457,7 @@
         (open ? g.list.map((e, i) => `<tr class="craft-detail"><td>${esc(fmtDate(e.date))}</td>${craftTotalCells(each[i])}
           <td><button class="link edit-only minus-btn" data-del="${esc(e.id)}" title="Delete entry" aria-label="Delete entry">&minus;</button></td></tr>`).join('') : '');
     });
-    $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="9" class="empty">${esc(TABS.crafting.empty)}</td></tr>`;
+    $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="7" class="empty">${esc(TABS.crafting.empty)}</td></tr>`;
   }
   function renderCraftCalc() {
     const box = $('craftCalc');
@@ -1474,38 +1478,76 @@
   // date, map, number of characters, and the run's Total White Scroll.
   const AVG_ITEM = 'White Scroll';
   let openRun = null; // the History run whose breakdown is showing
+  let openLoc = null; // the History location whose runs are showing
   function renderFarmRuns(entries) {
     const runs = new Map();
     entries.forEach(e => {
       const key = e.run || e.id;
-      if (!runs.has(key)) runs.set(key, { key, date: e.date, created: e.created, location: e.location, chars: e.chars, names: new Set(), qty: {} });
+      if (!runs.has(key)) runs.set(key, { key, date: e.date, created: e.created, location: e.location, duration: e.duration || '', chars: e.chars, names: new Set(), qty: {} });
       const r = runs.get(key);
       if (e.character) r.names.add(sameName(e.character));
       if (e.item) r.qty[e.item] = (r.qty[e.item] || 0) + (e.qty || 0);
     });
     const list = [...runs.values()].sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
-    $('historyBody').innerHTML = list.length ? list.map(r => {
-      const n = r.chars || r.names.size || 1;
-      // Total White Scroll for the run, worked out the same way as the Drop Table:
-      // Then = prices on the run's date, Now = latest prices.
-      const wsTotal = date => {
-        let ws = 0, any = false;
-        Object.entries(r.qty).forEach(([item, q]) => { const w = whiteScrollOf(item, q, date); if (w != null) { ws += w; any = true; } });
-        return any ? fmtWs(ws) : '&mdash;';
-      };
+    // Total White Scroll for a run, worked out the same way as the Drop Table:
+    // Then = prices on the run's date, Now = latest prices. null if nothing has a price.
+    const wsOf = (r, date) => {
+      let ws = 0, any = false;
+      Object.entries(r.qty).forEach(([item, q]) => { const w = whiteScrollOf(item, q, date); if (w != null) { ws += w; any = true; } });
+      return any ? ws : null;
+    };
+    const avg = xs => { const v = xs.filter(x => x != null); return v.length ? v.reduce((t, x) => t + x, 0) / v.length : null; };
+    const charsOf = r => r.chars || r.names.size || 1;
+    // White Scroll / Hour = White Scroll / hours, over the runs that have a Duration (Then uses each run's own date).
+    const perHour = (rs, when) => {
+      let ws = 0, hrs = 0, any = false;
+      rs.forEach(r => {
+        const h = durationHours(r.duration), w = wsOf(r, when ? r.date : null);
+        if (h && w != null) { ws += w; hrs += h; any = true; }
+      });
+      return any ? ws / hrs : null;
+    };
+    const runRow = r => {
       const open = openRun === r.key;
       // Map items in the saved order (Mesos first, then A-Z), plus anything logged that is no longer on the map.
       const items = [...new Set([...itemsOn(r.location), ...Object.keys(r.qty)])];
       items.sort((x, y) => (isMesos(y) - isMesos(x)) || x.localeCompare(y));
-      return `<tr class="run-row${open ? ' selected' : ''}" data-run="${esc(r.key)}" title="Click to see the breakdown">
+      return `<tr class="run-row loc-detail${open ? ' selected' : ''}" data-run="${esc(r.key)}" title="Click to see the breakdown">
         <td>${esc(fmtDate(r.date))}</td>
-        <td>${esc(locationName(r.location))}</td>
-        <td class="num">${fmt(n)}</td>
-        <td class="num">${wsTotal(r.date)}</td>
-        <td class="num">${wsTotal(null)}</td>
+        <td>${r.duration ? esc(r.duration) : '&mdash;'}</td>
+        <td class="num">${fmt(charsOf(r))}</td>
+        <td class="num">${fmtWs(wsOf(r, r.date))}</td>
+        <td class="num">${fmtWs(perHour([r], r.date))}</td>
+        <td class="num yl-div">${fmtWs(wsOf(r, null))}</td>
+        <td class="num">${fmtWs(perHour([r], null))}</td>
         <td><button class="link edit-only minus-btn" data-delrun="${esc(r.key)}" title="Delete this run" aria-label="Delete this run">&minus;</button></td>
-      </tr>` + (open ? `<tr class="run-detail"><td colspan="6">${totalTableHtml(items, i => r.qty[i] || 0, r.date)}</td></tr>` : '');
-    }).join('') : `<tr><td colspan="6" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
+      </tr>` + (open ? `<tr class="run-detail"><td colspan="8">${totalTableHtml(items, i => r.qty[i] || 0, r.date, r.duration)}</td></tr>` : '');
+    };
+    // One row per location / map (A-Z); click it to see each run by date (newest first).
+    // Location row: number of runs, total duration, average characters, and average White Scroll per run.
+    const groups = new Map();
+    list.forEach(r => {
+      const k = sameName(locationName(r.location) || '');
+      if (!groups.has(k)) groups.set(k, { key: k, name: locationName(r.location) || '(no map)', runs: [] });
+      groups.get(k).runs.push(r);
+    });
+    const mins = d => { const h = /(\d+)h/.exec(d || ''), m = /(\d+)mn/.exec(d || ''); return (h ? +h[1] * 60 : 0) + (m ? +m[1] : 0); };
+    const fmtMins = t => !t ? '&mdash;' : [Math.floor(t / 60) ? Math.floor(t / 60) + 'h' : '', t % 60 ? (t % 60) + 'mn' : ''].filter(Boolean).join(' ');
+    const rows = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })).map(g => {
+      const open = openLoc === g.key;
+      const avgChars = avg(g.runs.map(charsOf));
+      return `<tr class="loc-row${open ? ' selected' : ''}" data-loc="${esc(g.key)}" title="Click to see each run by date">
+        <td>${esc(g.name)} <span class="muted-count">(${g.runs.length})</span></td>
+        <td>${fmtMins(g.runs.reduce((t, r) => t + mins(r.duration), 0))}</td>
+        <td class="num">${avgChars == null ? '&mdash;' : avgChars.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
+        <td class="num">${fmtWs(avg(g.runs.map(r => wsOf(r, r.date))))}</td>
+        <td class="num">${fmtWs(perHour(g.runs, 'then'))}</td>
+        <td class="num yl-div">${fmtWs(avg(g.runs.map(r => wsOf(r, null))))}</td>
+        <td class="num">${fmtWs(perHour(g.runs, null))}</td>
+        <td></td>
+      </tr>` + (open ? g.runs.map(runRow).join('') : '');
+    });
+    $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="8" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
   }
 
   // One line per character: Character, then one quantity box per item on the chosen map.
@@ -1553,7 +1595,9 @@
   }
   // Calculated Total line: adds up each item across all the character lines as you type.
   // Column headers Clifton asked for. The last three have no calculation yet.
-  const TOT_HEADERS = ['Item', 'Total', 'Average Craft', 'Advanced Ore', 'Price', 'White Scroll', 'Total White Scroll'];
+  const TOT_HEADERS = ['Item', 'Total', 'Average Craft', 'Advanced Ore', 'Price', 'White Scroll', 'Total White Scroll', 'White Scroll / Hour'];
+  // Duration text like "1h 15mn" in hours (0 if none).
+  const durationHours = d => { const h = /(\d+)h/.exec(d || ''), m = /(\d+)mn/.exec(d || ''); return (h ? +h[1] : 0) + (m ? +m[1] / 60 : 0); };
   const TOT_BLANK = '<td class="num"></td>';
   // The latest price on the Prices page for this item, or null if it has none yet.
   const latestPrice = name => { const p = priceOf(name); return p ? mainPriceOf(p) : null; };
@@ -1594,10 +1638,11 @@
     if (!items.length) { box.innerHTML = ''; return; }
     const sum = item => [...document.querySelectorAll('#dropRows .drop-qty')]
       .filter(i => i.dataset.item === item).reduce((t, i) => t + (parseInt(i.value, 10) || 0), 0);
-    box.innerHTML = totalTableHtml(items, sum);
+    box.innerHTML = totalTableHtml(items, sum, null, $('f-duration') ? $('f-duration').value : '');
   }
   // The TOTAL table for a list of items and a function giving each item's total (used by the Drop Table and History).
-  function totalTableHtml(items, sum, date) {
+  // duration = the run's Duration, used for White Scroll / Hour (Total White Scroll / hours).
+  function totalTableHtml(items, sum, date, duration) {
     // Mesos = each item's total x its price on the Prices page (items with no price add nothing).
     let mesos = 0, unpriced = 0, totalWs = 0, anyWs = false;
     // If "Mesos" is one of the map's drops, the mesos typed in are added straight to the Mesos line, not listed twice.
@@ -1612,9 +1657,12 @@
     });
     // Total White Scroll = the White Scroll column added up across every row, Mesos included.
     const mesosWs = whiteScrollOf('Mesos', mesos, date);
-    return `<table class="tot-list"><thead><tr>${TOT_HEADERS.map((h, i) => `<th class="${i ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead>
+    const totWs = anyWs || mesosWs != null ? totalWs + (mesosWs || 0) : null, hours = durationHours(duration);
+    const rowspan = lines.filter(Boolean).length + 1;
+    return `<table class="tot-list"><thead><tr>${TOT_HEADERS.map((h, i) => `<th class="${i ? 'num' : ''}${i === 7 ? ' yl-div' : ''}">${esc(h)}</th>`).join('')}</tr></thead>
       <tr class="mesos" title="${unpriced ? unpriced + ' item(s) have no price yet' : 'From the Prices page'}"><td>Mesos</td><td class="num">${fmtMoney(mesos)}</td>${totExtra('Mesos', mesos, date)}
-        <td class="num tot-ws" rowspan="${lines.filter(Boolean).length + 1}">${anyWs || mesosWs != null ? fmtWs(totalWs + (mesosWs || 0)) : '&mdash;'}</td></tr>
+        <td class="num tot-ws" rowspan="${rowspan}">${fmtWs(totWs)}</td>
+        <td class="num tot-ws yl-div" rowspan="${rowspan}">${totWs == null || !hours ? '&mdash;' : fmtWs(totWs / hours)}</td></tr>
       ${lines.join('')}</table>`;
   }
   $('entryForm').addEventListener('input', e => { if (e.target.classList.contains('drop-qty')) renderDropTotal(); });
@@ -1644,6 +1692,7 @@
   // Saves one entry per character and item with a quantity, all sharing the same run id.
   function addFarmingRun() {
     const location = $('f-location').value;
+    const duration = $('f-duration') ? $('f-duration').value : '';
     const run = newId(), created = Date.now();
     const added = [];
     // Count every line that has a name or a number, even if that character got nothing.
@@ -1653,7 +1702,7 @@
       const character = row.querySelector('.drop-char').value.trim();
       row.querySelectorAll('.drop-qty').forEach(i => {
         const qty = parseInt(i.value, 10);
-        if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, chars, character, location, item: i.dataset.item, qty });
+        if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, chars, character, location, duration, item: i.dataset.item, qty });
       });
     });
     const first = document.querySelector('#dropRows .drop-qty');
@@ -1671,6 +1720,8 @@
     render();
   }
   $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-location') renderItemSelect(); });
+  // Remember the last Duration picked so it stays chosen when the form is rebuilt.
+  $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-duration') { lastPick.duration = e.target.value; renderDropTotal(); } });
 
   function renderMapItems() {
     const pick = $('locItemsFor');
@@ -1764,6 +1815,8 @@
       save('farming'); render();
       return;
     }
+    const locRow = e.target.closest('tr.loc-row');
+    if (locRow) { openLoc = openLoc === locRow.dataset.loc ? null : locRow.dataset.loc; render(); return; }
     const craftRow = e.target.closest('tr.craft-row');
     if (craftRow) { openCraft = openCraft === craftRow.dataset.craft ? null : craftRow.dataset.craft; render(); return; }
     const runRow = e.target.closest('tr.run-row');
