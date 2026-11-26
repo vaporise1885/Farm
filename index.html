@@ -873,7 +873,7 @@
 
   // Categories = the fixed list + any used by an item + any added this visit (kept once an item uses it).
   // The category list: saved once you add or remove one; until then the starting list above is used.
-  const CAT_DOC = '__categories__';
+  const CAT_DOC = '_categories';   // Firestore does not allow ids that start and end with __
   const CAT_KEY = 'priceCategories.v1';
   let categoryList = null;
   // Categories picked for farming drops that don't have a price yet, keyed by item name (capitals/spaces ignored).
@@ -1306,7 +1306,7 @@
 
 
   /* ---- Farming locations: a fixed dropdown, managed like categories ---- */
-  const LOC_DOC = '__locations__';
+  const LOC_DOC = '_locations';
   const LOC_KEY = 'farmLocations.v1';
   let locationList = null;
   try { const l = JSON.parse(localStorage.getItem(LOC_KEY)); if (Array.isArray(l)) locationList = l; } catch (e) {}
