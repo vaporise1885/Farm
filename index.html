@@ -158,6 +158,11 @@
     .drop-total-wrap { padding-top: 12px; border-top: 2px solid var(--hl-border); }
     .drop-actions.drop-total-wrap { align-items: flex-end; flex-wrap: wrap; }
     .drop-total-wrap [data-submit] { margin-left: auto; }
+    .info { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%;
+      border: 1px solid var(--hl-border); color: var(--hl-border); font: italic 700 10px/1 Georgia, serif; cursor: help; vertical-align: middle; text-transform: none; }
+    .info:hover, .info:focus { background: var(--hl-border); color: var(--bg); outline: none; }
+    .tip-box { position: fixed; z-index: 1000; max-width: 280px; padding: 9px 12px; border-radius: 8px; background: var(--panel); color: var(--text);
+      border: 1px solid var(--hl-border); box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: 0.82rem; font-weight: 400; line-height: 1.4; white-space: normal; pointer-events: none; }
     tr.run-row { cursor: pointer; }
     .tot-list th.yl-div, .tot-list td.yl-div { border-left: 2px solid var(--hl-border); padding-left: 14px; }
     .tot-list.craft-totals th, .tot-list.craft-totals th.wrap-th { white-space: nowrap; width: auto; vertical-align: bottom; padding-left: 40px; }
@@ -803,6 +808,84 @@
     cutoff.setDate(cutoff.getDate() - (parseInt(range, 10) - 1));
     return new Date(dateStr) >= cutoff;
   }
+
+  // "i" icons beside calculated column headers. Hover, focus or tap one to see how the column is worked out.
+  const HEADER_TIPS = {
+    'farm-total': {
+      'Total': 'Added up across every character line for this item.',
+      'Average Craft': 'Ores only. From Crafting history for this ore: Total Advanced ÷ Ores used (1 Basic = 0.01 Advanced, 1 Intermediate = 0.1 Advanced).',
+      'Advanced Ore': 'Ores only. Total × Average Craft.',
+      'Price': 'From Prices (ores use their Advanced price). Drop Table: latest price. History breakdown: the price on the run\'s date.',
+      'White Scroll': 'Ores: Advanced Ore × Price ÷ White Scroll price. Everything else (Mesos too): Total × Price ÷ White Scroll price.',
+      'Total White Scroll': 'The White Scroll column added up.',
+      'White Scroll / Hour': 'Total White Scroll ÷ Duration in hours.'
+    },
+    'farm-hist': {
+      'Duration': 'Date row: the run\'s Duration. Location row: all its runs added up.',
+      'Characters': 'Date row: character lines in the run. Location row: average per run.',
+      'White Scroll (Then)': 'The run\'s Total White Scroll using prices on the run\'s date. Location row: average per run.',
+      'White Scroll / Hour (Then)': 'White Scroll (Then) ÷ hours. Location row: all runs\' White Scroll (Then) ÷ all their hours (runs with a Duration).',
+      'White Scroll (Now)': 'The run\'s Total White Scroll using the latest prices. Location row: average per run.',
+      'White Scroll / Hour (Now)': 'White Scroll (Now) ÷ hours. Location row: all runs\' White Scroll (Now) ÷ all their hours (runs with a Duration).'
+    },
+    'craft-into': {
+      'Quantity': 'What you typed for this tier, added up across every ore line.',
+      '= Advanced each': 'What 1 of this tier is worth in Advanced: Basic 0.01, Intermediate 0.1, Advanced 1.',
+      'Advanced': 'Quantity × Advanced each.'
+    },
+    'craft': {
+      'Ores used': 'The Ore number entered.',
+      'Total Advanced': 'Basic × 0.01 + Intermediate × 0.1 + Advanced.',
+      'Average Craft': 'Total Advanced ÷ Ores used.',
+      'White Scroll (Then)': 'Total Advanced × the ore\'s Advanced price on the craft date ÷ White Scroll price on that date.',
+      'White Scroll (Now)': 'Total Advanced × the ore\'s latest Advanced price ÷ latest White Scroll price.'
+    },
+    'craft-hist': {
+      'Ores used': 'Date row: the Ore number. Item row: all its crafts added up.',
+      'Total Advanced': 'Basic × 0.01 + Intermediate × 0.1 + Advanced. Item row: all its crafts added up.',
+      'Average Craft': 'Total Advanced ÷ Ores used. Farming uses the item row\'s figure.',
+      'White Scroll (Then)': 'Total Advanced × the ore\'s Advanced price on the craft date ÷ White Scroll price on that date. Item row: average of its crafts.',
+      'White Scroll (Now)': 'Date row: Total Advanced × latest Advanced price ÷ latest White Scroll price. Item row: Average Craft × average Ores used per craft × latest Advanced price ÷ latest White Scroll price.'
+    }
+  };
+  function tipContext(th) {
+    if (th.closest('#dropTotal') || th.closest('.run-detail')) return 'farm-total';
+    if (th.closest('#craftCalc')) return th.closest('table.craft-totals') ? 'craft' : 'craft-into';
+    if (th.closest('#historyHead')) return current === 'farming' ? 'farm-hist' : current === 'crafting' ? 'craft-hist' : null;
+    return null;
+  }
+  function addHeaderTips() {
+    document.querySelectorAll('th:not([data-tipped])').forEach(th => {
+      th.dataset.tipped = '1';
+      const ctx = tipContext(th);
+      if (!ctx) return;
+      const label = (th.firstChild ? th.firstChild.textContent : '').trim();
+      const tip = HEADER_TIPS[ctx][label];
+      if (!tip) return;
+      const i = document.createElement('span');
+      i.className = 'info'; i.tabIndex = 0; i.textContent = 'i'; i.dataset.tip = tip;
+      i.setAttribute('role', 'button'); i.setAttribute('aria-label', 'How ' + label + ' is worked out: ' + tip);
+      th.append(i);
+    });
+  }
+  new MutationObserver(addHeaderTips).observe(document.body, { childList: true, subtree: true });
+  // One floating box, placed next to the icon, so tables that scroll do not cut it off.
+  const tipBox = document.createElement('div');
+  tipBox.className = 'tip-box'; tipBox.hidden = true;
+  document.body.append(tipBox);
+  const showTip = el => {
+    tipBox.textContent = el.dataset.tip; tipBox.hidden = false;
+    const r = el.getBoundingClientRect(), w = tipBox.offsetWidth;
+    tipBox.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+    tipBox.style.top = (r.bottom + 8) + 'px';
+  };
+  const hideTip = () => { tipBox.hidden = true; };
+  document.addEventListener('mouseover', e => { const el = e.target.closest && e.target.closest('.info'); if (el) showTip(el); });
+  document.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('.info')) hideTip(); });
+  document.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('info')) showTip(e.target); });
+  document.addEventListener('focusout', e => { if (e.target.classList && e.target.classList.contains('info')) hideTip(); });
+  document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('.info'); if (el) { e.stopPropagation(); showTip(el); } }, true);
+  window.addEventListener('scroll', hideTip, true);
 
   function render() {
     const cfg = TABS[current];
@@ -1535,15 +1618,17 @@
     if (!box) return;
     const lines = craftLines();
     const name = l => esc((l.item || '').replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || l.item || '—');
-    // Crafted into: each tier's quantity and what it is worth in Advanced, one row per ore line.
-    const conv = (q, rate) => `${fmt(q)} <span class="muted-count">= ${fmtRate(q * rate)}</span>`;
-    const rows = lines.map(l => `<tr><td>${name(l)}</td>${CRAFT_TIERS.map(([id, , rate]) => `<td class="num">${conv(l[id], rate)}</td>`).join('')}</tr>`).join('');
+    // Crafted into: one row per tier, quantities added up across every ore line.
+    const rows = CRAFT_TIERS.map(([id, label, rate]) => {
+      const q = lines.reduce((a, l) => a + (l[id] || 0), 0);
+      return `<tr><td>${esc(label)}</td><td class="num">${fmt(q)}</td><td class="num">${fmtRate(rate)}</td><td class="num">${fmtRate(q * rate)}</td></tr>`;
+    }).join('');
     const each = lines.map(l => craftTotals(l, l.item, todayStr()));
     // With more than one line, a Total row adds them up (Average Craft = Total Advanced / Ores used).
     const sum = k => { const v = each.map(t => t[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
     const ore = sum('ore') || 0, adv = sum('adv') || 0;
     const total = lines.length > 1 ? `<tr class="calc-total"><td>Total</td>${craftTotalCells({ ore, adv, perOre: ore ? adv / ore : null, wsThen: sum('wsThen'), wsNow: sum('wsNow') })}</tr>` : '';
-    box.innerHTML = `<table class="tot-list"><thead><tr><th>Crafted into</th>${CRAFT_TIERS.map(([, label, rate]) => `<th class="num">${esc(label)} <span class="muted-count">(= ${fmtRate(rate)} Advanced)</span></th>`).join('')}</tr></thead>
+    box.innerHTML = `<table class="tot-list"><thead><tr><th>Crafted into</th><th class="num">Quantity</th><th class="num">= Advanced each</th><th class="num">Advanced</th></tr></thead>
       ${rows}</table>
       <table class="tot-list craft-totals"><thead><tr><th>Item</th>${CRAFT_TOTAL_HEADS}</tr></thead>
       ${lines.map((l, i) => `<tr><td>${name(l)}</td>${craftTotalCells(each[i])}</tr>`).join('')}${total}</table>`;
