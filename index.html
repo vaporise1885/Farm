@@ -135,6 +135,7 @@
     .new-row .cell::placeholder { color: var(--muted); }
     td.w-item { min-width: 160px; }
     td.w-cat { min-width: 130px; }
+    td.w-cat .sub-sel { display: block; width: 100%; margin-top: 4px; }
     td.w-price { min-width: 100px; }
     td.w-date { min-width: 150px; }
     .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -200,7 +201,7 @@
     .total-row td { font-weight: 700; border-top: 2px solid var(--border); }
     .pending-name { display: inline-block; padding: 7px 9px; }
     .tiers { display: flex; gap: 6px; justify-content: flex-end; }
-    .tiers > * { width: 96px; flex: none; text-align: right; }
+    .tiers > * { width: 80px; flex: none; text-align: right; }
     .tiers input.cell { padding-left: 4px; padding-right: 4px; }
     .ore-name { display: inline-block; padding: 6px 8px; }
   .tier-head td { font-weight: 700; padding-top: 18px; border-bottom: 2px solid var(--hl-border); }
@@ -1088,10 +1089,14 @@
   // Categories with several prices per item (Clifton's columns). The first filled column is the item's main price,
   // which Farming and the price history use.
   const TIERS = {
-    ores: { title: 'Ores', cols: ['Ore', 'Basic', 'Intermediate', 'Advanced'], main: 'Advanced' },
+    ores: { title: 'Ores', cols: ['Ore', 'Crystal', 'Basic', 'Intermediate', 'Advanced'], main: 'Advanced' },
     scrolls: { title: 'Scrolls', cols: ['10%', '30%', '60%', '70%', '100%'] }
   };
   const tierKey = p => Object.keys(TIERS).find(k => sameName(p.category || '') === sameName(TIERS[k].title)) || null;
+  // Plate ores only have an Ore and a Plate price (main = Plate). Crystal ores (and ores with no subcategory yet) use the full set.
+  const PLATE_TIER = { cols: ['Ore', 'Plate'], main: 'Plate' };
+  const isPlate = p => tierKey(p) === 'ores' && p.sub === 'Plate';
+  const tierSetOf = p => isPlate(p) ? PLATE_TIER : TIERS[tierKey(p)];
   // Tier prices for an item; an older single price shows in the first column.
   function tiersOf(p) {
     if (p.tiers && typeof p.tiers === 'object') {
@@ -1106,11 +1111,12 @@
     const k = tierKey(p);
     if (!k) return p.price ?? null;
     const t = tiersOf(p);
-    return TIERS[k].main ? (t[TIERS[k].main] ?? null) : (TIERS[k].cols.map(c => t[c]).find(x => x != null) ?? null);
+    const set = tierSetOf(p);
+    return set.main ? (t[set.main] ?? null) : (set.cols.map(c => t[c]).find(x => x != null) ?? null);
   }
   function tierInputs(p, editable) {
     const t = tiersOf(p);
-    return `<div class="tiers">${TIERS[tierKey(p)].cols.map(c => editable
+    return `<div class="tiers">${tierSetOf(p).cols.map(c => editable
       ? `<input class="cell num" type="text" inputmode="decimal" autocomplete="off" data-id="${esc(p.id)}" data-field="tier" data-tier="${esc(c)}" value="${esc(withCommas(t[c]))}" placeholder="&mdash;" aria-label="${esc(p.item)} ${esc(c)} price">`
       : `<span>${t[c] != null ? fmtMoney(t[c]) : '&mdash;'}</span>`).join('')}</div>`;
   }
@@ -1126,6 +1132,7 @@
     });
     return out.map(n => ({ id: 'drop:' + n, item: n, price: null, updated: '', category: dropCats[sameName(n)] || '', pending: true }));
   }
+  const ORE_SUBS = ['Crystal', 'Plate'];
   function renderPrices() {
     if (!$('catManager').hidden) renderCategoryManager();
     $('np-date').textContent = fmtDate(todayStr());
@@ -1168,6 +1175,10 @@
     const catCell = p => `<td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}</td>`;
     // In the Ores section, show names without the word "ore" (stored name is unchanged).
     const shownName = p => tierKey(p) === 'ores' ? (p.item.replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || p.item) : p.item;
+    // Ores get a Subcategory too: Crystal or Plate (saved as `sub`).
+    const subCell = p => tierKey(p) !== 'ores' ? '' : editable
+      ? `<select class="cell sub-sel" data-id="${esc(p.id)}" data-field="sub" aria-label="Subcategory"><option value="">Subcategory</option>${ORE_SUBS.map(o => `<option${p.sub === o ? ' selected' : ''}>${o}</option>`).join('')}</select>`
+      : (p.sub ? ` <span class="chip">${esc(p.sub)}</span>` : '');
     const rowHtml = p => {
       if (p.pending) return `<tr class="pending-row" title="Drop from Farming with no price yet">
         <td class="w-item"><span class="pending-name" title="${esc(p.item)}">${esc(shownName(p))}</span></td>
@@ -1180,7 +1191,7 @@
       const prev = h.length > 1 ? h[h.length - 2] : null;
       return `<tr class="${p.id === historyId ? 'selected' : ''}">
         <td class="w-item">${tierKey(p) === 'ores' ? `<span class="ore-name" title="${esc(p.item)}">${esc(shownName(p))}</span>` : editable ? cell(p, 'item', 'text', 'aria-label="Item" list="dl-pitem"') : esc(p.item)}</td>
-        <td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}</td>
+        <td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}${subCell(p)}</td>
         <td class="num w-price">${tierKey(p) ? tierInputs(p, editable) : editable ? cell(p, 'price', 'number', 'aria-label="Price" min="0" step="any"') : fmtMoney(p.price)}</td>
         <td class="w-date">${esc(fmtDate(p.updated))}</td>
         <td class="actions"><button class="link edit" data-hist="${esc(p.id)}">History</button><button class="link edit-only minus-btn" data-pdel="${esc(p.id)}" title="Remove ${esc(p.item)}" aria-label="Remove ${esc(p.item)}">&times;</button></td>
@@ -1188,10 +1199,15 @@
     };
     // Ores and Scrolls get their own sections, each with its own price columns.
     const plain = list.filter(p => !tierKey(p));
+    const head = (title, cols) => `<tr class="tier-head"><td colspan="2">${esc(title)}</td><td class="w-price"><div class="tiers">${cols.map(c => `<span>${esc(c)}</span>`).join('')}</div></td><td></td><td></td></tr>`;
     const section = key => {
       const rows = list.filter(p => tierKey(p) === key);
       if (!rows.length) return '';
-      return `<tr class="tier-head"><td colspan="2">${esc(TIERS[key].title)}</td><td class="w-price"><div class="tiers">${TIERS[key].cols.map(c => `<span>${esc(c)}</span>`).join('')}</div></td><td></td><td></td></tr>` + rows.map(rowHtml).join('');
+      if (key !== 'ores') return head(TIERS[key].title, TIERS[key].cols) + rows.map(rowHtml).join('');
+      // Ores split by subcategory, each with its own price columns.
+      const crystal = rows.filter(p => !isPlate(p)), plate = rows.filter(isPlate);
+      return (crystal.length ? head(plate.length ? 'Ores · Crystal' : 'Ores', TIERS.ores.cols) + crystal.map(rowHtml).join('') : '')
+        + (plate.length ? head('Ores · Plate', PLATE_TIER.cols) + plate.map(rowHtml).join('') : '');
     };
     $('priceBody').innerHTML = list.length ? plain.map(rowHtml).join('') + section('ores') + section('scrolls')
       : `<tr><td colspan="5" class="empty">${prices.length ? 'No items match your search.' : (editable ? 'No prices yet. Type one in the row above.' : 'No prices yet.')}</td></tr>`;
@@ -1356,6 +1372,10 @@
       p.item = v;
     } else if (field === 'category') {
       p.category = v;
+    } else if (field === 'sub') {
+      if (v) p.sub = v; else delete p.sub;
+      const main = mainPriceOf(p);
+      if (main != null && main !== p.price) upsertPrice(p.item, main, todayStr(), '');
     } else if (field === 'price') {
       const price = parseFloat(noCommas(v));
       if (!(price >= 0)) { renderPrices(); return; }
@@ -1514,7 +1534,7 @@
     const box = (k, label, cls = '') => `<label class="${cls}"><span class="lbl">${label}</span><input type="text" inputmode="decimal" autocomplete="off" class="c-${k}" data-k="${k}" placeholder="0" aria-label="${label}"></label>`;
     return `<div class="top-row drop-line drop-row craft-row">
       <label><span class="lbl">Item</span><select class="c-item" aria-label="Item"></select></label>
-      ${box('ore', 'Ore')}${box('basic', 'Basic', 'c-div')}${box('intermediate', 'Intermediate')}${box('advanced', 'Advanced')}
+      ${box('ore', 'Ore')}<label><span class="lbl">Crystal</span><input type="text" inputmode="decimal" autocomplete="off" class="c-crystal" placeholder="0" aria-label="Crystal (1/10 of Ore)"></label>${box('basic', 'Basic', 'c-div')}${box('intermediate', 'Intermediate')}${box('advanced', 'Advanced')}
       ${first ? '' : '<button type="button" class="row-del" title="Remove this ore" aria-label="Remove this ore">&times;</button>'}
     </div>`;
   }
@@ -1525,6 +1545,17 @@
     return v;
   });
   // Saves one craft per line that has any number, then clears the numbers (items stay).
+  // Crystal is always 1/10 of Ore: typing either one fills in the other.
+  // (Capture, so the calculation table sees the filled-in number.)
+  document.addEventListener('input', e => {
+    const el = e.target, row = el.closest && el.closest('#craftRows .craft-row');
+    if (!row || !(el.classList.contains('c-ore') || el.classList.contains('c-crystal'))) return;
+    const raw = noCommas(el.value), v = parseFloat(raw);
+    const other = row.querySelector(el.classList.contains('c-ore') ? '.c-crystal' : '.c-ore');
+    if (raw === '' || !(v >= 0)) { other.value = ''; return; }
+    const n = el.classList.contains('c-ore') ? v / 10 : v * 10;
+    other.value = withCommas(Math.round(n * 1000) / 1000);
+  }, true);
   function addCrafts() {
     const created = Date.now();
     const added = craftLines().filter(l => l.item && (l.ore || l.basic || l.intermediate || l.advanced))
@@ -1532,7 +1563,7 @@
     if (!added.length) { notify('Pick an item and enter at least one number.'); return; }
     data.crafting.push(...added);
     save('crafting');
-    document.querySelectorAll('#craftRows input[data-k]').forEach(i => { i.value = ''; });
+    document.querySelectorAll('#craftRows input').forEach(i => { i.value = ''; });
     const first = document.querySelector('#craftRows .c-ore');
     if (first) first.focus();
     render();
@@ -1542,7 +1573,7 @@
     if (!sels.length) return;
     const items = [];
     prices.concat(farmDropsWithoutPrice()).forEach(p => {
-      if (sameName(p.category || '') === sameName(CRAFT_CATEGORY) && !items.some(i => sameName(i) === sameName(p.item))) items.push(p.item);
+      if (sameName(p.category || '') === sameName(CRAFT_CATEGORY) && !isPlate(p) && !items.some(i => sameName(i) === sameName(p.item))) items.push(p.item);
     });
     items.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     const opts = items.length
@@ -1785,7 +1816,7 @@
     return ore ? adv / ore : null;
   };
   // Items in the Ores category (from Prices, or the category picked for an unpriced drop).
-  const isOreItem = name => { const p = priceOf(name); return sameName((p ? p.category : dropCats[sameName(name)]) || '') === sameName('Ores'); };
+  const isOreItem = name => { const p = priceOf(name); return !(p && isPlate(p)) && sameName((p ? p.category : dropCats[sameName(name)]) || '') === sameName('Ores'); };
   // Advanced Ore = Total x Average Craft, for Ores only.
   const advancedOreOf = (name, total) => { const a = avgCraftOf(name); return a == null ? null : total * a; };
   // White Scroll: Ores = (Advanced Ore x latest Price) / latest White Scroll price; everything else = (Total x latest Price) / latest White Scroll price.
