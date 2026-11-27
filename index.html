@@ -175,7 +175,9 @@
     .tot-list tr.calc-total td { border-top: 1px solid var(--border); padding-top: 6px; }
     /* Yellow divider line (Crafting: between Ore and Basic). */
     th.yl-div, td.yl-div { border-left: 2px solid var(--hl-border); }
-    #entryForm label:has(> #f-basic) { border-left: 2px solid var(--hl-border); padding-left: 12px; }
+    #entryForm label.c-div { border-left: 2px solid var(--hl-border); padding-left: 12px; }
+    .craft-row label { width: 130px; }
+    .tot-list.craft-totals th:first-child { text-align: left; padding-left: 0; }
     tr.run-detail > td { padding: 12px 16px 16px; }
     .tot-list tr, .tot-list td { background: transparent !important; }
     .tot-list { width: auto; min-width: 260px; border-collapse: collapse; }
@@ -734,8 +736,11 @@
         ? `<div class="full" id="dropRows">${dropRowHtml(true)}</div><datalist id="dl-character"></datalist>` +
           `<div class="full"><button type="button" class="add-char" id="addCharRow">+ Add character</button></div>` +
           `<div class="full drop-actions drop-total-wrap"><div class="drop-total" id="dropTotal"></div><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
-        : cfg.fields.filter(f => !f.top).map(fieldHtml).join('') + `<button type="button" class="primary" data-submit>Add</button>` +
-          (current === 'crafting' ? `<div class="full drop-total-wrap"><div class="drop-total" id="craftCalc"></div></div>` : ''));
+        : current === 'crafting'
+        ? `<div class="full" id="craftRows">${craftRowHtml(true)}</div>` +
+          `<div class="full"><button type="button" class="add-char" id="addCraftRow">+ Add new ore</button></div>` +
+          `<div class="full drop-actions drop-total-wrap"><div class="drop-total" id="craftCalc"></div><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
+        : cfg.fields.filter(f => !f.top).map(fieldHtml).join('') + `<button type="button" class="primary" data-submit>Add</button>`);
     // Farming starts with 5 character lines.
     if (current === 'farming') for (let i = 1; i < 5; i++) $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
 
@@ -775,6 +780,7 @@
   function submitEntry() {
     const cfg = TABS[current];
     if (current === 'farming') { addFarmingRun(); return; }
+    if (current === 'crafting') { addCrafts(); return; }
     const entry = { id: newId(), date: todayStr(), created: Date.now() };   // the day it was entered
     for (const f of cfg.fields) {
       const v = $('f-' + f.id).value;
@@ -786,7 +792,6 @@
     save(current);
     // Keep date and location (handy for farming several drops in one spot); clear the rest.
     for (const f of cfg.fields) if (f.type !== 'select' && f.type !== 'drops') $('f-' + f.id).value = f.type === 'number' ? 1 : '';
-    $('f-item').focus();
     render();
   }
 
@@ -1421,43 +1426,56 @@
   }
   // Crafting Item dropdown: every item on Prices (priced or not) whose category is "Ores".
   const CRAFT_CATEGORY = 'Ores';
+  // One Crafting line: Item, Ore, then what it was crafted into. "+ Add new ore" adds more lines.
+  function craftRowHtml(first) {
+    const box = (k, label, cls = '') => `<label class="${cls}"><span class="lbl">${label}</span><input type="text" inputmode="decimal" autocomplete="off" class="c-${k}" data-k="${k}" placeholder="0" aria-label="${label}"></label>`;
+    return `<div class="top-row drop-line drop-row craft-row">
+      <label><span class="lbl">Item</span><select class="c-item" aria-label="Item"></select></label>
+      ${box('ore', 'Ore')}${box('basic', 'Basic', 'c-div')}${box('intermediate', 'Intermediate')}${box('advanced', 'Advanced')}
+      ${first ? '' : '<button type="button" class="row-del" title="Remove this ore" aria-label="Remove this ore">&times;</button>'}
+    </div>`;
+  }
+  // Every Crafting line as { item, ore, basic, intermediate, advanced }.
+  const craftLines = () => [...document.querySelectorAll('#craftRows .craft-row')].map(row => {
+    const v = { item: row.querySelector('.c-item').value };
+    row.querySelectorAll('input[data-k]').forEach(i => { v[i.dataset.k] = parseFloat(noCommas(i.value)) || 0; });
+    return v;
+  });
+  // Saves one craft per line that has any number, then clears the numbers (items stay).
+  function addCrafts() {
+    const created = Date.now();
+    const added = craftLines().filter(l => l.item && (l.ore || l.basic || l.intermediate || l.advanced))
+      .map((l, i) => ({ id: newId(), date: todayStr(), created: created + i, qty: 1, ...l }));
+    if (!added.length) { notify('Pick an item and enter at least one number.'); return; }
+    data.crafting.push(...added);
+    save('crafting');
+    document.querySelectorAll('#craftRows input[data-k]').forEach(i => { i.value = ''; });
+    const first = document.querySelector('#craftRows .c-ore');
+    if (first) first.focus();
+    render();
+  }
   function renderCraftItemSelect() {
-    const sel = $('f-item');
-    if (!sel) return;
-    const chosen = sel.value;
+    const sels = [...document.querySelectorAll('#craftRows select.c-item')];
+    if (!sels.length) return;
     const items = [];
     prices.concat(farmDropsWithoutPrice()).forEach(p => {
       if (sameName(p.category || '') === sameName(CRAFT_CATEGORY) && !items.some(i => sameName(i) === sameName(p.item))) items.push(p.item);
     });
     items.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    sel.innerHTML = items.length
+    const opts = items.length
       ? items.map(c => `<option value="${esc(c)}">${esc(c.replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || c)}</option>`).join('')
       : `<option value="">No items in ${esc(CRAFT_CATEGORY)} yet</option>`;
-    sel.insertAdjacentHTML('beforeend', `<option value="${ADD_CRAFT}">+ New item...</option>`);
-    sel.value = items.find(c => sameName(c) === sameName(chosen)) || items[0] || '';
+    // Keep each line's pick; a new line starts on the first ore not already used on another line.
+    const used = sels.map(s => s.dataset.pick || '');
+    sels.forEach((sel, n) => {
+      const chosen = sel.dataset.pick || '';
+      sel.innerHTML = opts;
+      sel.value = items.find(c => sameName(c) === sameName(chosen))
+        || (chosen ? '' : items.find(c => !used.some(u => sameName(u) === sameName(c)))) || items[0] || '';
+      sel.dataset.pick = used[n] = sel.value;
+    });
     renderCraftCalc();
   }
-  // "+ New item..." in the Crafting Item dropdown: adds the item to Prices in the Ores category (no price yet).
-  const ADD_CRAFT = '__addcraft__';
-  $('entryForm').addEventListener('change', async e => {
-    const sel = e.target;
-    if (sel.id !== 'f-item' || sel.value !== ADD_CRAFT) { if (sel.id === 'f-item') sel.dataset.prev = sel.value; return; }
-    const name = String(await askText('New item name') || '').trim().replace(/\s+/g, ' ');
-    if (!name) { sel.value = sel.dataset.prev || ''; renderCraftCalc(); return; }
-    const ex = priceOf(name);
-    if (ex && ex.category && sameName(ex.category) !== sameName(CRAFT_CATEGORY)) {
-      notify(`${ex.item} is already in Prices under ${ex.category}. Change its category to ${CRAFT_CATEGORY} to craft it.`);
-      sel.value = sel.dataset.prev || ''; renderCraftCalc(); return;
-    }
-    if (ex) { ex.category = CRAFT_CATEGORY; notify(`${ex.item} is already in Prices.`); }
-    else prices.push({ id: newId(), item: name, price: null, updated: todayStr(), category: CRAFT_CATEGORY, prevPrice: null, prevUpdated: null, history: [] });
-    savePrices();
-    sel.dataset.prev = '';
-    renderCraftItemSelect();
-    sel.value = ex ? ex.item : name;
-    sel.dataset.prev = sel.value;
-    renderCraftCalc();
-  });
   // Crafting calculation table: the Ore is crafted into Basic, Intermediate and Advanced.
   // Everything is converted to Advanced (1 Basic = 0.01 Advanced, 1 Intermediate = 0.1 Advanced) to get Advanced per Ore.
   const CRAFT_TIERS = [['basic', 'Basic', 0.01], ['intermediate', 'Intermediate', 0.1], ['advanced', 'Advanced', 1]];
@@ -1485,7 +1503,7 @@
   // Crafting history: one row per item; click it to see that item's crafts by date.
   // Item row: Ores used and Total Advanced are sums over all its crafts; Advanced Per Ore = Total Advanced / Ores used;
   // Mesos and White Scroll (Then) are averages of each craft's Then values;
-  // Mesos (Now) = Advanced Per Ore x latest Advanced price, White Scroll (Now) = that / latest White Scroll price.
+  // White Scroll (Now) = Average Craft x average Ores used per craft x latest Advanced price / latest White Scroll price.
   let openCraft = null;
   function renderCraftHistory(entries) {
     const groups = new Map();
@@ -1500,7 +1518,8 @@
       const ore = each.reduce((t, x) => t + x.ore, 0), adv = each.reduce((t, x) => t + x.adv, 0);
       const perOre = ore ? adv / ore : null;
       const p = priceOf(g.item), advPrice = p ? (tiersOf(p).Advanced ?? null) : null, wsPrice = latestPrice('White Scroll');
-      const mesosNow = perOre == null || advPrice == null ? null : perOre * advPrice;
+      // Now = Average Craft x the average Ores used per craft x latest Advanced price, so it is per craft like Then.
+      const mesosNow = perOre == null || advPrice == null ? null : perOre * (ore / g.list.length) * advPrice;
       const sum = { ore, adv, perOre, mesosThen: avg(each.map(x => x.mesosThen)), wsThen: avg(each.map(x => x.wsThen)),
         mesosNow, wsNow: mesosNow == null || !wsPrice ? null : mesosNow / wsPrice };
       const open = openCraft === g.key;
@@ -1514,17 +1533,27 @@
   function renderCraftCalc() {
     const box = $('craftCalc');
     if (!box) return;
-    const vals = {};
-    ['ore', ...CRAFT_TIERS.map(t => t[0])].forEach(id => { const el = $('f-' + id); vals[id] = el ? (parseFloat(noCommas(el.value)) || 0) : 0; });
-    const rows = CRAFT_TIERS.map(([id, label, rate]) => `<tr><td>${esc(label)}</td><td class="num">${fmt(vals[id])}</td><td class="num">${fmtRate(rate)}</td><td class="num">${fmtRate(vals[id] * rate)}</td></tr>`).join('');
-    const item = $('f-item') ? $('f-item').value : '';
-    const { adv } = craftTotals(vals, item, todayStr());
-    box.innerHTML = `<table class="tot-list"><thead><tr><th>Crafted into</th><th class="num">Quantity</th><th class="num">= Advanced each</th><th class="num">Advanced</th></tr></thead>
+    const lines = craftLines();
+    const name = l => esc((l.item || '').replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || l.item || '—');
+    // Crafted into: each tier's quantity and what it is worth in Advanced, one row per ore line.
+    const conv = (q, rate) => `${fmt(q)} <span class="muted-count">= ${fmtRate(q * rate)}</span>`;
+    const rows = lines.map(l => `<tr><td>${name(l)}</td>${CRAFT_TIERS.map(([id, , rate]) => `<td class="num">${conv(l[id], rate)}</td>`).join('')}</tr>`).join('');
+    const each = lines.map(l => craftTotals(l, l.item, todayStr()));
+    // With more than one line, a Total row adds them up (Average Craft = Total Advanced / Ores used).
+    const sum = k => { const v = each.map(t => t[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
+    const ore = sum('ore') || 0, adv = sum('adv') || 0;
+    const total = lines.length > 1 ? `<tr class="calc-total"><td>Total</td>${craftTotalCells({ ore, adv, perOre: ore ? adv / ore : null, wsThen: sum('wsThen'), wsNow: sum('wsNow') })}</tr>` : '';
+    box.innerHTML = `<table class="tot-list"><thead><tr><th>Crafted into</th>${CRAFT_TIERS.map(([, label, rate]) => `<th class="num">${esc(label)} <span class="muted-count">(= ${fmtRate(rate)} Advanced)</span></th>`).join('')}</tr></thead>
       ${rows}</table>
-      <table class="tot-list craft-totals"><thead><tr>${CRAFT_TOTAL_HEADS}</tr></thead><tr>${craftTotalCells(craftTotals(vals, item, todayStr()))}</tr></table>`;
+      <table class="tot-list craft-totals"><thead><tr><th>Item</th>${CRAFT_TOTAL_HEADS}</tr></thead>
+      ${lines.map((l, i) => `<tr><td>${name(l)}</td>${craftTotalCells(each[i])}</tr>`).join('')}${total}</table>`;
   }
   $('entryForm').addEventListener('input', () => { if (current === 'crafting') renderCraftCalc(); });
-  $('entryForm').addEventListener('change', () => { if (current === 'crafting') renderCraftCalc(); });
+  $('entryForm').addEventListener('change', e => {
+    if (current !== 'crafting') return;
+    if (e.target.classList.contains('c-item')) e.target.dataset.pick = e.target.value;
+    renderCraftCalc();
+  });
 
   // Farming history groups the drops saved together (one run) into one row:
   // date, map, number of characters, and the run's Total White Scroll.
@@ -1736,9 +1765,13 @@
       $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
       renderItemSelect();
       $('dropRows').lastElementChild.querySelector('.drop-char').focus();
+    } else if (e.target.id === 'addCraftRow') {
+      $('craftRows').insertAdjacentHTML('beforeend', craftRowHtml(false));
+      renderCraftItemSelect();
+      $('craftRows').lastElementChild.querySelector('.c-ore').focus();
     } else if (e.target.classList.contains('row-del')) {
       e.target.closest('.drop-row').remove();
-      renderDropTotal();
+      if (current === 'crafting') renderCraftCalc(); else renderDropTotal();
     }
   });
   // Saves one entry per character and item with a quantity, all sharing the same run id.
