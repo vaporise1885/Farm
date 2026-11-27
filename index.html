@@ -50,7 +50,7 @@
 
     /* ---- Main ---- */
     main { flex: 1; min-width: 0; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; }
+    .wrap { max-width: 1500px; margin: 0 auto; padding: 24px 20px 48px; }
     h1 { margin: 0 0 4px; font-size: 1.7rem; }
     .sub { color: var(--muted); margin: 0 0 22px; }
     .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
@@ -157,6 +157,13 @@
     .drop-line button[data-submit] { min-width: 120px; }
     .drop-row + .drop-row { margin-top: 10px; }
     .drop-total-wrap { padding-top: 12px; border-top: 2px solid var(--hl-border); }
+    .sess-map { font-weight: 700; margin: 12px 0 4px; color: var(--hl-border); }
+    .sess-map:first-child { margin-top: 0; }
+    .sess-total { margin-top: 12px; padding-top: 10px; border-top: 2px solid var(--hl-border); }
+    .map-block { display: flex; flex-direction: column; gap: 12px; }
+    .extra-map { margin-top: 8px; padding-top: 16px; border-top: 2px dashed var(--hl-border); }
+    .map-head { align-items: flex-end; }
+    .map-head .map-del { margin-bottom: 4px; }
     .drop-actions.drop-total-wrap { align-items: flex-end; flex-wrap: wrap; }
     .drop-total-wrap [data-submit] { margin-left: auto; }
     .info { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%;
@@ -164,7 +171,7 @@
     .info:hover, .info:focus { background: var(--hl-border); color: var(--bg); outline: none; }
     .tip-box { position: fixed; z-index: 1000; max-width: 280px; padding: 9px 12px; border-radius: 8px; background: var(--panel); color: var(--text);
       border: 1px solid var(--hl-border); box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: 0.82rem; font-weight: 400; line-height: 1.4; white-space: normal; pointer-events: none; }
-    tr.run-row { cursor: pointer; }
+    tr.run-row, tr.sess-row { cursor: pointer; }
     .tot-list th.yl-div, .tot-list td.yl-div { border-left: 2px solid var(--hl-border); padding-left: 14px; }
     .tot-list.craft-totals th, .tot-list.craft-totals th.wrap-th { white-space: nowrap; width: auto; vertical-align: bottom; padding-left: 40px; }
     .tot-list.craft-totals td.num { padding-left: 40px; }
@@ -201,7 +208,7 @@
     .total-row td { font-weight: 700; border-top: 2px solid var(--border); }
     .pending-name { display: inline-block; padding: 7px 9px; }
     .tiers { display: flex; gap: 6px; justify-content: flex-end; }
-    .tiers > * { width: 76px; flex: none; text-align: right; }
+    .tiers > * { width: 100px; flex: none; text-align: right; }
     .tiers input.cell { padding-left: 4px; padding-right: 4px; }
     .ore-name { display: inline-block; padding: 6px 8px; }
   .tier-head td { font-weight: 700; padding-top: 18px; border-bottom: 2px solid var(--hl-border); }
@@ -210,7 +217,7 @@
     .drop-row + .drop-row .lbl { display: none; }   /* only the first line shows the headers */
     .drop-actions { display: flex; align-items: center; gap: 12px; }
     .drop-actions button[data-submit] { min-width: 120px; }
-    .drop-line .row-del { border: none; background: none; color: var(--danger); font-size: 1.4rem; line-height: 1; padding: 8px 12px; }
+    .drop-line .row-del, .map-del { border: none; background: none; color: var(--danger); font-size: 1.4rem; line-height: 1; padding: 8px 12px; }
     .drop-line .row-del:hover { opacity: .75; }
     .add-char { border: 1px dashed var(--border); background: none; color: var(--accent); font-weight: 600; }
     .map-pick { position: relative; }
@@ -345,6 +352,16 @@
             </table>
           </div>
         </div>
+
+        <div class="panel" id="sessionPanel" hidden>
+          <h2>Session history</h2>
+          <div class="table-scroll">
+            <table>
+              <thead id="sessionHead"><tr><th>Date</th><th>Maps</th><th>Duration</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th></tr></thead>
+              <tbody id="sessionBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       </div>
@@ -372,7 +389,6 @@
                 <th class="sortable" data-sort="item">Item <span class="arrow"></span></th>
                 <th class="sortable" data-sort="category">Category <span class="arrow"></span></th>
                 <th class="sortable num" data-sort="price">Price <span class="arrow"></span></th>
-                <th class="sortable" data-sort="updated">Date last updated <span class="arrow"></span></th>
                 <th></th>
               </tr></thead>
               <tbody class="edit-only">
@@ -380,7 +396,6 @@
                   <td class="w-item"><input class="cell" id="np-item" list="dl-pitem" placeholder="New item" aria-label="New item name"></td>
                   <td class="w-cat"><select class="cell" id="np-cat" aria-label="New item category"></select><select class="cell sub-sel" id="np-sub" aria-label="New item subcategory"><option value="">Subcategory</option><option>Crystal</option><option>Plate</option></select></td>
                   <td class="w-price"><input class="cell num" id="np-price" type="text" inputmode="decimal" autocomplete="off" placeholder="Price" aria-label="New item price"></td>
-                  <td class="w-date" id="np-date" title="Set automatically to the day you add the price"></td>
                   <td class="actions"><button type="button" class="primary" id="np-add">Add</button></td>
                 </tr>
               </tbody>
@@ -740,9 +755,11 @@
       cfg.fields.filter(f => f.top).map(fieldHtml).join('') +
       `<span class="spacer"></span></div>` +
       (current === 'farming'
-        ? `<div class="full" id="dropRows">${dropRowHtml(true)}</div><datalist id="dl-character"></datalist>` +
-          `<div class="full"><button type="button" class="add-char" id="addCharRow">+ Add character</button></div>` +
-          `<div class="full drop-actions drop-total-wrap"><div class="drop-total" id="dropTotal"></div><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
+        ? `<div class="full map-block" data-main="1"><div class="drop-rows" id="dropRows">${dropRowHtml(true)}</div>` +
+          `<div><button type="button" class="add-char add-char-btn" id="addCharRow">+ Add character</button></div>` +
+          `<div class="drop-total-wrap"><div class="drop-total farm-total" id="dropTotal"></div></div></div><datalist id="dl-character"></datalist>` +
+          `<div class="full" id="extraMaps"></div>` +
+          `<div class="full drop-actions"><button type="button" class="add-char" id="addMapBlock">+ Add another map</button><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
         : current === 'crafting'
         ? `<div class="full" id="craftRows">${craftRowHtml(true)}</div>` +
           `<div class="full"><button type="button" class="add-char" id="addCraftRow">+ Add new ore</button></div>` +
@@ -830,6 +847,14 @@
       'White Scroll (Now)': 'The run\'s Total White Scroll using the latest prices. Location row: average per run.',
       'White Scroll / Hour (Now)': 'White Scroll (Now) ÷ hours. Location row: all runs\' White Scroll (Now) ÷ all their hours (runs with a Duration).'
     },
+    'sess-hist': {
+      'Maps': 'The maps saved together with one Add.',
+      'Characters': 'Character lines across all the maps in the session.',
+      'White Scroll (Then)': 'Every map\'s Total White Scroll added up, using prices on the session date.',
+      'White Scroll / Hour (Then)': 'White Scroll (Then) ÷ the session Duration in hours (the maps run at the same time).',
+      'White Scroll (Now)': 'Every map\'s Total White Scroll added up, using the latest prices.',
+      'White Scroll / Hour (Now)': 'White Scroll (Now) ÷ the session Duration in hours.'
+    },
     'craft-into': {
       'Quantity': 'What you typed for this tier, added up across every ore line.',
       '= Advanced each': 'What 1 of this tier is worth in Advanced: Basic 0.01, Intermediate 0.1, Advanced 1.',
@@ -851,8 +876,9 @@
     }
   };
   function tipContext(th) {
-    if (th.closest('#dropTotal') || th.closest('.run-detail')) return 'farm-total';
+    if (th.closest('.farm-total') || th.closest('.run-detail')) return 'farm-total';
     if (th.closest('#craftCalc')) return th.closest('table.craft-totals') ? 'craft' : 'craft-into';
+    if (th.closest('#sessionHead')) return 'sess-hist';
     if (th.closest('#historyHead')) return current === 'farming' ? 'farm-hist' : current === 'crafting' ? 'craft-hist' : null;
     return null;
   }
@@ -901,6 +927,7 @@
       .sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
 
     const cols = 4 + textFields.length;
+    $('sessionPanel').hidden = current !== 'farming';
     if (current === 'farming') renderFarmRuns(filtered);
     else if (current === 'crafting') renderCraftHistory(filtered);
     else $('historyBody').innerHTML = filtered.length ? filtered.map(e => `
@@ -1143,7 +1170,6 @@
   const ORE_SUBS = ['Crystal', 'Plate'];
   function renderPrices() {
     if (!$('catManager').hidden) renderCategoryManager();
-    $('np-date').textContent = fmtDate(todayStr());
     const q = $('p-search').value.trim().toLowerCase();
     // The fixed list first, then any older category still used by an item, so nothing disappears.
     const cats = allCategories();
@@ -1185,14 +1211,13 @@
     const shownName = p => tierKey(p) === 'ores' ? (p.item.replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || p.item) : p.item;
     // Ores get a Subcategory too: Crystal or Plate (saved as `sub`).
     const subCell = p => editable
-      ? `<select class="cell sub-sel" data-id="${esc(p.id)}" data-field="sub" aria-label="Subcategory"><option value="">Subcategory</option>${ORE_SUBS.map(o => `<option${p.sub === o ? ' selected' : ''}>${o}</option>`).join('')}</select>`
+      ? `<select class="cell sub-sel" data-id="${esc(p.id)}" data-field="sub" aria-label="Subcategory"><option value="">&mdash;</option>${ORE_SUBS.map(o => `<option${p.sub === o ? ' selected' : ''}>${o}</option>`).join('')}</select>`
       : (p.sub ? ` <span class="chip">${esc(p.sub)}</span>` : '');
     const rowHtml = p => {
       if (p.pending) return `<tr class="pending-row" title="Drop from Farming with no price yet">
         <td class="w-item"><span class="pending-name" title="${esc(p.item)}">${esc(shownName(p))}</span></td>
         <td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}${subCell(p)}</td>
         <td class="num w-price">${tierKey(p) ? tierInputs(p, editable) : editable ? cell(p, 'price', 'number', 'aria-label="Price" min="0" step="any" placeholder="Set price"') : '&mdash;'}</td>
-        <td class="w-date">&mdash;</td>
         <td class="actions"></td>
       </tr>`;
       const h = historyOf(p);
@@ -1201,13 +1226,12 @@
         <td class="w-item">${tierKey(p) === 'ores' ? `<span class="ore-name" title="${esc(p.item)}">${esc(shownName(p))}</span>` : editable ? cell(p, 'item', 'text', 'aria-label="Item" list="dl-pitem"') : esc(p.item)}</td>
         <td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}${subCell(p)}</td>
         <td class="num w-price">${tierKey(p) ? tierInputs(p, editable) : editable ? cell(p, 'price', 'number', 'aria-label="Price" min="0" step="any"') : fmtMoney(p.price)}</td>
-        <td class="w-date">${esc(fmtDate(p.updated))}</td>
         <td class="actions"><button class="link edit" data-hist="${esc(p.id)}">History</button><button class="link edit-only minus-btn" data-pdel="${esc(p.id)}" title="Remove ${esc(p.item)}" aria-label="Remove ${esc(p.item)}">&times;</button></td>
       </tr>`;
     };
     // Ores and Scrolls get their own sections, each with its own price columns.
     const plain = list.filter(p => !tierKey(p));
-    const head = (title, cols) => `<tr class="tier-head"><td colspan="2">${esc(title)}</td><td class="w-price"><div class="tiers">${cols.map(c => `<span>${esc(c)}</span>`).join('')}</div></td><td></td><td></td></tr>`;
+    const head = (title, cols) => `<tr class="tier-head"><td colspan="2">${esc(title)}</td><td class="w-price"><div class="tiers">${cols.map(c => `<span>${esc(c)}</span>`).join('')}</div></td><td></td></tr>`;
     const section = key => {
       const rows = list.filter(p => tierKey(p) === key);
       if (!rows.length) return '';
@@ -1218,7 +1242,7 @@
         + (plate.length ? head('Ores · Plate', PLATE_TIER.cols) + plate.map(rowHtml).join('') : '');
     };
     $('priceBody').innerHTML = list.length ? plain.map(rowHtml).join('') + section('ores') + section('scrolls')
-      : `<tr><td colspan="5" class="empty">${prices.length ? 'No items match your search.' : (editable ? 'No prices yet. Type one in the row above.' : 'No prices yet.')}</td></tr>`;
+      : `<tr><td colspan="4" class="empty">${prices.length ? 'No items match your search.' : (editable ? 'No prices yet. Type one in the row above.' : 'No prices yet.')}</td></tr>`;
     if (keep) {
       const el = $('priceBody').querySelector(`[data-id="${CSS.escape(keep.id)}"][data-field="${keep.field}"]${keep.tier ? `[data-tier="${CSS.escape(keep.tier)}"]` : ''}`);
       if (el) el.focus();
@@ -1554,6 +1578,11 @@
       : '<option value="">No locations yet</option>';
     // Keep the current choice; otherwise start on the first location.
     sel.value = locs.find(c => sameName(c) === sameName(chosen)) || locs[0] || '';
+    document.querySelectorAll('#extraMaps .map-loc').forEach(m => {
+      const was = m.value;
+      m.innerHTML = sel.innerHTML;
+      m.value = locs.find(c => sameName(c) === sameName(was)) || locs[0] || '';
+    });
     renderItemSelect();
     if (!$('locManager').hidden) renderLocationManager();
   }
@@ -1706,11 +1735,12 @@
   const AVG_ITEM = 'White Scroll';
   let openRun = null; // the History run whose breakdown is showing
   let openLoc = null; // the History location whose runs are showing
+  let openSess = null; // the Session history row whose breakdown is showing
   function renderFarmRuns(entries) {
     const runs = new Map();
     entries.forEach(e => {
       const key = e.run || e.id;
-      if (!runs.has(key)) runs.set(key, { key, date: e.date, created: e.created, location: e.location, duration: e.duration || '', chars: e.chars, names: new Set(), qty: {} });
+      if (!runs.has(key)) runs.set(key, { key, session: e.session || '', date: e.date, created: e.created, location: e.location, duration: e.duration || '', chars: e.chars, names: new Set(), qty: {} });
       const r = runs.get(key);
       if (e.character) r.names.add(sameName(e.character));
       if (e.item) r.qty[e.item] = (r.qty[e.item] || 0) + (e.qty || 0);
@@ -1734,13 +1764,29 @@
       });
       return any ? ws / hrs : null;
     };
-    const runRow = r => {
-      const open = openRun === r.key;
+    // Maps saved together with one Add form a session (all runs with the same session id).
+    const allRuns = [...runs.values()];
+    const sessionOf = r => r.session ? allRuns.filter(x => x.session === r.session).sort((a, b) => a.created - b.created) : [r];
+    const itemsOfRun = r => {
       // Map items in the saved order (Mesos first, then A-Z), plus anything logged that is no longer on the map.
       const items = [...new Set([...itemsOn(r.location), ...Object.keys(r.qty)])];
-      items.sort((x, y) => (isMesos(y) - isMesos(x)) || x.localeCompare(y));
+      return items.sort((x, y) => (isMesos(y) - isMesos(x)) || x.localeCompare(y));
+    };
+    const runDetail = r => {
+      const sess = sessionOf(r);
+      if (sess.length < 2) return totalTableHtml(itemsOfRun(r), i => r.qty[i] || 0, r.date, r.duration);
+      // Whole session: each map's breakdown, then the session added up (Then prices; maps run at the same time, so hours = the Duration).
+      const ws = sess.map(x => wsOf(x, x.date)).filter(v => v != null), total = ws.length ? ws.reduce((a, b) => a + b, 0) : null;
+      const hrs = durationHours(r.duration);
+      return sess.map(x => `<div class="sess-map">${esc(locationName(x.location) || '(no map)')}</div>` +
+          totalTableHtml(itemsOfRun(x), i => x.qty[i] || 0, x.date, x.duration)).join('') +
+        `<div class="sess-total">Session total (${sess.length} maps${r.duration ? ', ' + esc(r.duration) : ''}): White Scroll (Then) <b>${fmtWs(total)}</b> · White Scroll / Hour (Then) <b>${total == null || !hrs ? '&mdash;' : fmtWs(total / hrs)}</b></div>`;
+    };
+    const runRow = r => {
+      const open = openRun === r.key;
+      const others = sessionOf(r).filter(x => x.key !== r.key);
       return `<tr class="run-row loc-detail${open ? ' selected' : ''}" data-run="${esc(r.key)}" title="Click to see the breakdown">
-        <td>${esc(fmtDate(r.date))}</td>
+        <td>${esc(fmtDate(r.date))}${others.length ? ` <span class="muted-count">with ${others.map(x => esc(locationName(x.location) || '(no map)')).join(', ')}</span>` : ''}</td>
         <td>${r.duration ? esc(r.duration) : '&mdash;'}</td>
         <td class="num">${fmt(charsOf(r))}</td>
         <td class="num">${fmtWs(wsOf(r, r.date))}</td>
@@ -1748,7 +1794,7 @@
         <td class="num yl-div">${fmtWs(wsOf(r, null))}</td>
         <td class="num">${fmtWs(perHour([r], null))}</td>
         <td><button class="link edit-only minus-btn" data-delrun="${esc(r.key)}" title="Delete this run" aria-label="Delete this run">&times;</button></td>
-      </tr>` + (open ? `<tr class="run-detail"><td colspan="8">${totalTableHtml(items, i => r.qty[i] || 0, r.date, r.duration)}</td></tr>` : '');
+      </tr>` + (open ? `<tr class="run-detail"><td colspan="8">${runDetail(r)}</td></tr>` : '');
     };
     // One row per location / map (A-Z); click it to see each run by date (newest first).
     // Location row: number of runs, total duration, average characters, and average White Scroll per run.
@@ -1775,6 +1821,30 @@
       </tr>` + (open ? g.runs.map(runRow).join('') : '');
     });
     $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="8" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
+
+    // Session history: one row per Add (all maps saved together), newest first. Runs saved before sessions existed count as their own session.
+    const sessions = new Map();
+    list.forEach(r => {
+      const k = r.session || r.key;
+      if (!sessions.has(k)) sessions.set(k, { key: k, runs: [] });
+      sessions.get(k).runs.push(r);
+    });
+    const sum = xs => { const v = xs.filter(x => x != null); return v.length ? v.reduce((t, x) => t + x, 0) : null; };
+    $('sessionBody').innerHTML = sessions.size ? [...sessions.values()].map(sv => {
+      const rs = sv.runs.slice().sort((a, b) => a.created - b.created), r0 = rs[0], open = openSess === sv.key;
+      const hrs = durationHours(r0.duration);
+      const then = sum(rs.map(r => wsOf(r, r.date))), now = sum(rs.map(r => wsOf(r, null)));
+      return `<tr class="sess-row${open ? ' selected' : ''}" data-sess="${esc(sv.key)}" title="Click to see the breakdown">
+        <td>${esc(fmtDate(r0.date))}</td>
+        <td>${rs.map(r => esc(locationName(r.location) || '(no map)')).join(', ')}</td>
+        <td>${r0.duration ? esc(r0.duration) : '&mdash;'}</td>
+        <td class="num">${fmt(rs.reduce((t, r) => t + charsOf(r), 0))}</td>
+        <td class="num">${fmtWs(then)}</td>
+        <td class="num">${then == null || !hrs ? '&mdash;' : fmtWs(then / hrs)}</td>
+        <td class="num yl-div">${fmtWs(now)}</td>
+        <td class="num">${now == null || !hrs ? '&mdash;' : fmtWs(now / hrs)}</td>
+      </tr>` + (open ? `<tr class="run-detail"><td colspan="8">${runDetail(r0)}</td></tr>` : '');
+    }).join('') : `<tr><td colspan="8" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
   }
 
   // One line per character: Character, then one quantity box per item on the chosen map.
@@ -1786,7 +1856,7 @@
   }
   // Keep each line's choice when the list changes.
   function refreshCharSelects() {
-    document.querySelectorAll('#dropRows select.drop-char').forEach(sel => {
+    document.querySelectorAll('.drop-rows select.drop-char').forEach(sel => {
       const v = sel.value;
       sel.innerHTML = charOptions(v);
       sel.value = allCharacters().includes(v) ? v : '';
@@ -1795,7 +1865,7 @@
   }
   function dropRowHtml(first) {
     // New lines start on the next character not already picked on another line.
-    const used = [...document.querySelectorAll('#dropRows select.drop-char')].map(s => s.value);
+    const used = [...document.querySelectorAll('.drop-rows select.drop-char')].map(s => s.value);
     const pick = first ? allCharacters()[0] : (allCharacters().find(c => !used.includes(c)) || '');
     return `<div class="top-row drop-line drop-row">
       <label><span class="lbl">Character</span><select class="drop-char" aria-label="Character" data-prev="${esc(pick || '')}">${charOptions(pick)}</select></label>
@@ -1804,10 +1874,17 @@
     </div>`;
   }
   // Draw the item boxes on every line. Typed numbers are kept while the map stays the same.
+  // Farming can log more than one map at once: each map block has its own location, characters and TOTAL table.
+  const mapBlocks = () => [...document.querySelectorAll('#entryForm .map-block')];
+  const blockLoc = block => block.dataset.main ? ($('f-location') ? $('f-location').value : '') : block.querySelector('.map-loc').value;
   function renderItemSelect() {
-    const rows = $('dropRows');
-    if (!rows || current !== 'farming') return;
-    const loc = $('f-location').value;
+    if (current !== 'farming') return;
+    mapBlocks().forEach(renderBlockItems);
+    renderDropTotal();
+  }
+  function renderBlockItems(block) {
+    const rows = block.querySelector('.drop-rows');
+    const loc = blockLoc(block);
     const items = itemsOn(loc);
     rows.querySelectorAll('.drop-row').forEach(row => {
       const box = row.querySelector('.drops');
@@ -1818,7 +1895,6 @@
         ? items.map(c => `<label><span class="lbl">${esc(c)}</span><input type="text" inputmode="decimal" autocomplete="off" class="drop-qty" data-item="${esc(c)}" aria-label="${esc(c)}" placeholder="0" value="${esc(typed[c] || '')}"></label>`).join('')
         : `<span class="note drops-empty">${loc ? 'No items on this map yet. Add them with Manage locations.' : 'Add a map with Manage locations first.'}</span>`;
     });
-    renderDropTotal();
   }
   // Calculated Total line: adds up each item across all the character lines as you type.
   // Column headers Clifton asked for. The last three have no calculation yet.
@@ -1861,13 +1937,14 @@
   // Item row cells after Total: Average Craft, Advanced Ore (no calculation yet), Price, White Scroll. Total White Scroll is one shared cell (see below).
   const totExtra = (name, total, date) => (!isOreItem(name) ? TOT_BLANK + TOT_BLANK : `<td class="num">${avgCraftOf(name) == null ? '&mdash;' : fmtPct(avgCraftOf(name))}</td>` + `<td class="num">${fmtWs(advancedOreOf(name, total))}</td>`) + `<td class="num">${priceCell(name, date)}</td><td class="num">${fmtWs(whiteScrollOf(name, total, date))}</td>`;
   function renderDropTotal() {
-    const box = $('dropTotal');
-    if (!box) return;
-    const items = itemsOn($('f-location').value);
-    if (!items.length) { box.innerHTML = ''; return; }
-    const sum = item => [...document.querySelectorAll('#dropRows .drop-qty')]
-      .filter(i => i.dataset.item === item).reduce((t, i) => t + (parseInt(noCommas(i.value), 10) || 0), 0);
-    box.innerHTML = totalTableHtml(items, sum, null, $('f-duration') ? $('f-duration').value : '');
+    mapBlocks().forEach(block => {
+      const box = block.querySelector('.farm-total');
+      const items = itemsOn(blockLoc(block));
+      if (!items.length) { box.innerHTML = ''; return; }
+      const sum = item => [...block.querySelectorAll('.drop-qty')]
+        .filter(i => i.dataset.item === item).reduce((t, i) => t + (parseInt(noCommas(i.value), 10) || 0), 0);
+      box.innerHTML = totalTableHtml(items, sum, null, $('f-duration') ? $('f-duration').value : '');
+    });
   }
   // The TOTAL table for a list of items and a function giving each item's total (used by the Drop Table and History).
   // duration = the run's Duration, used for White Scroll / Hour (Total White Scroll / hours).
@@ -1909,10 +1986,29 @@
     sel.value = chosen; sel.dataset.prev = chosen;
   });
   $('entryForm').addEventListener('click', e => {
-    if (e.target.id === 'addCharRow') {
-      $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
+    if (e.target.classList.contains('add-char-btn')) {
+      const rows = e.target.closest('.map-block').querySelector('.drop-rows');
+      rows.insertAdjacentHTML('beforeend', dropRowHtml(false));
       renderItemSelect();
-      $('dropRows').lastElementChild.querySelector('.drop-char').focus();
+      rows.lastElementChild.querySelector('.drop-char').focus();
+    } else if (e.target.id === 'addMapBlock') {
+      // A second (third...) map: starts on a map not already picked, with one character line.
+      const locs = allLocations(), usedLocs = mapBlocks().map(blockLoc);
+      const pick = locs.find(l => !usedLocs.some(u => sameName(u) === sameName(l))) || locs[0] || '';
+      $('extraMaps').insertAdjacentHTML('beforeend', `<div class="map-block extra-map">
+        <div class="top-row map-head"><label>Location / map<select class="map-loc" aria-label="Location / map">${$('f-location').innerHTML}</select></label>
+          <button type="button" class="row-del map-del" title="Remove this map" aria-label="Remove this map">&times;</button></div>
+        <div class="drop-rows">${dropRowHtml(false)}</div>
+        <div><button type="button" class="add-char add-char-btn">+ Add character</button></div>
+        <div class="drop-total-wrap"><div class="drop-total farm-total"></div></div></div>`);
+      const block = $('extraMaps').lastElementChild;
+      block.querySelector('.map-loc').value = pick;
+      block.querySelector('.drop-rows .row-del').remove();   // a map always keeps at least one line
+      renderItemSelect();
+      block.querySelector('.map-loc').focus();
+    } else if (e.target.classList.contains('map-del')) {
+      e.target.closest('.map-block').remove();
+      renderDropTotal();
     } else if (e.target.id === 'addCraftRow') {
       $('craftRows').insertAdjacentHTML('beforeend', craftRowHtml(false));
       renderCraftItemSelect();
@@ -1924,21 +2020,24 @@
   });
   // Saves one entry per character and item with a quantity, all sharing the same run id.
   function addFarmingRun() {
-    const location = $('f-location').value;
     const duration = $('f-duration') ? $('f-duration').value : '';
-    const run = newId(), created = Date.now();
+    const created = Date.now(), session = newId();
     const added = [];
-    // Count every line that has a name or a number, even if that character got nothing.
-    const chars = [...document.querySelectorAll('#dropRows .drop-row')].filter(row =>
-      row.querySelector('.drop-char').value.trim() || [...row.querySelectorAll('.drop-qty')].some(i => i.value !== '')).length;
-    document.querySelectorAll('#dropRows .drop-row').forEach(row => {
-      const character = row.querySelector('.drop-char').value.trim();
-      row.querySelectorAll('.drop-qty').forEach(i => {
-        const qty = parseInt(noCommas(i.value), 10);
-        if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, chars, character, location, duration, item: i.dataset.item, qty });
+    // Each map is saved as its own run, all sharing one session id (so History lists it under its location).
+    mapBlocks().forEach(block => {
+      const location = blockLoc(block), run = newId();
+      const rows = [...block.querySelectorAll('.drop-row')];
+      // Count every line that has a number. On the first map, also lines with just a name (as before).
+      const chars = rows.filter(row => (block.dataset.main && row.querySelector('.drop-char').value.trim()) || [...row.querySelectorAll('.drop-qty')].some(i => i.value !== '')).length;
+      rows.forEach(row => {
+        const character = row.querySelector('.drop-char').value.trim();
+        row.querySelectorAll('.drop-qty').forEach(i => {
+          const qty = parseInt(noCommas(i.value), 10);
+          if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, session, chars, character, location, duration, item: i.dataset.item, qty });
+        });
       });
     });
-    const first = document.querySelector('#dropRows .drop-qty');
+    const first = document.querySelector('.drop-rows .drop-qty');
     if (!added.length) {
       notify('Enter a quantity for at least one item.');
       if (first) first.focus();
@@ -1947,12 +2046,12 @@
     data.farming.push(...added);
     save('farming');
     // Keep the characters and lines; clear the numbers for the next run.
-    document.querySelectorAll('#dropRows .drop-qty').forEach(i => { i.value = ''; });
+    document.querySelectorAll('.drop-rows .drop-qty').forEach(i => { i.value = ''; });
     renderDropTotal();
     if (first) first.focus();
     render();
   }
-  $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-location') renderItemSelect(); });
+  $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-location' || e.target.classList.contains('map-loc')) renderItemSelect(); });
   // Remember the last Duration picked so it stays chosen when the form is rebuilt.
   $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-duration') { lastPick.duration = e.target.value; renderDropTotal(); } });
 
@@ -2058,6 +2157,10 @@
     if (!id || !(await ask('Delete this entry?'))) return;
     data[current] = data[current].filter(x => x.id !== id);
     save(current); render();
+  });
+  $('sessionBody').addEventListener('click', e => {
+    const row = e.target.closest('tr.sess-row');
+    if (row) { openSess = openSess === row.dataset.sess ? null : row.dataset.sess; render(); }
   });
   $('search').addEventListener('input', render);
   $('range').addEventListener('change', render);
