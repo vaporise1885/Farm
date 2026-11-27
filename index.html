@@ -188,12 +188,13 @@
     .tot-list th:nth-child(7), .tot-list th:nth-child(8) { text-align: center; }
     /* Yellow divider between White Scroll and Total White Scroll. */
     .tot-list th:nth-child(7), .tot-list td:nth-child(7) { border-left: 2px solid var(--hl-border); }
-    button.minus-btn { color: var(--danger); font-size: 1.25rem; line-height: 1; padding: 2px 10px; font-weight: 600; }
+    button.minus-btn { color: var(--danger); font-size: 1.4rem; line-height: 1; padding: 2px 10px; font-weight: 600; }
     button.minus-btn:hover { opacity: .75; }
     .total-row td { font-weight: 700; border-top: 2px solid var(--border); }
     .pending-name { display: inline-block; padding: 7px 9px; }
     .tiers { display: flex; gap: 6px; justify-content: flex-end; }
-    .tiers > * { width: 92px; flex: none; text-align: right; }
+    .tiers > * { width: 96px; flex: none; text-align: right; }
+    .tiers input.cell { padding-left: 4px; padding-right: 4px; }
     .ore-name { display: inline-block; padding: 6px 8px; }
   .tier-head td { font-weight: 700; padding-top: 18px; border-bottom: 2px solid var(--hl-border); }
     .tier-head .tiers span { color: var(--muted); font-size: 0.8rem; font-weight: 600; padding-right: 9px; }
@@ -201,8 +202,8 @@
     .drop-row + .drop-row .lbl { display: none; }   /* only the first line shows the headers */
     .drop-actions { display: flex; align-items: center; gap: 12px; }
     .drop-actions button[data-submit] { min-width: 120px; }
-    .drop-line .row-del { border: none; background: none; color: var(--muted); font-size: 1.4rem; line-height: 1; padding: 8px 12px; }
-    .drop-line .row-del:hover { color: var(--danger); }
+    .drop-line .row-del { border: none; background: none; color: var(--danger); font-size: 1.4rem; line-height: 1; padding: 8px 12px; }
+    .drop-line .row-del:hover { opacity: .75; }
     .add-char { border: 1px dashed var(--border); background: none; color: var(--accent); font-weight: 600; }
     .map-pick { position: relative; }
     #locPick { display: inline-flex; align-items: center; gap: 10px; background: var(--bg); font-weight: 600; min-width: 160px; justify-content: space-between; }
@@ -211,8 +212,8 @@
     .map-opt:hover, .map-opt.on { background: var(--accent-soft); }
     .map-opt .map-name { flex: 1; text-align: left; border: none; background: none; padding: 7px 10px; font-weight: inherit; }
     .map-opt.on .map-name { font-weight: 600; }
-    .map-opt .map-minus { border: none; background: none; color: var(--muted); padding: 2px 10px; font-size: 1.15rem; line-height: 1; font-weight: 600; }
-    .map-opt .map-minus:hover { color: var(--danger); }
+    .map-opt .map-minus { border: none; background: none; color: var(--danger); padding: 2px 10px; font-size: 1.3rem; line-height: 1; font-weight: 600; }
+    .map-opt .map-minus:hover { opacity: .75; }
     .map-menu .map-add { display: block; width: 100%; text-align: left; border: none; background: none; padding: 7px 10px; color: var(--accent); font-weight: 600; border-top: 1px solid var(--border); border-radius: 0 0 6px 6px; margin-top: 2px; }
     .map-menu .map-add:hover { background: var(--accent-soft); }
     .map-items-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600; }
@@ -370,7 +371,7 @@
                 <tr class="new-row">
                   <td class="w-item"><input class="cell" id="np-item" list="dl-pitem" placeholder="New item" aria-label="New item name"></td>
                   <td class="w-cat"><select class="cell" id="np-cat" aria-label="New item category"></select></td>
-                  <td class="w-price"><input class="cell num" id="np-price" type="number" min="0" step="any" placeholder="Price" aria-label="New item price"></td>
+                  <td class="w-price"><input class="cell num" id="np-price" type="text" inputmode="decimal" autocomplete="off" placeholder="Price" aria-label="New item price"></td>
                   <td class="w-date" id="np-date" title="Set automatically to the day you add the price"></td>
                   <td class="actions"><button type="button" class="primary" id="np-add">Add</button></td>
                 </tr>
@@ -518,7 +519,30 @@
   };
 
   const $ = id => document.getElementById(id);
-  const lastPick = {};
+  const lastPick = { duration: '1h' };
+  // Number boxes show thousands separators (13,000,000); commas are removed before a value is used.
+  const noCommas = s => String(s ?? '').replace(/,/g, '').trim();
+  const withCommas = v => {
+    if (v == null || v === '') return '';
+    const [i, d] = noCommas(v).split('.');
+    return i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (d !== undefined ? '.' + d : '');
+  };
+  // Re-add commas as you type, keeping the cursor in the same place among the digits.
+  document.addEventListener('input', e => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || el.inputMode !== 'decimal') return;
+    const pos = el.selectionStart ?? el.value.length;
+    const before = el.value.slice(0, pos).replace(/[^\d.]/g, '').length;
+    let clean = el.value.replace(/[^\d.]/g, '');
+    const dot = clean.indexOf('.');
+    if (dot >= 0) clean = clean.slice(0, dot + 1) + clean.slice(dot + 1).replace(/\./g, '');
+    const out = withCommas(clean);
+    if (out === el.value) return;
+    el.value = out;
+    let n = 0, i = 0;
+    while (i < out.length && n < before) { if (/[\d.]/.test(out[i])) n++; i++; }
+    el.setSelectionRange(i, i);
+  }, true);   // Duration starts on 1h
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = n => n.toLocaleString();
   // Dates are stored as YYYY-MM-DD (so they sort correctly) and shown as DD/MM/YYYY.
@@ -692,11 +716,11 @@
     $('statItemsLabel').textContent = cfg.itemsLabel;
 
     const fieldHtml = f => f.type === 'drops' ? '' : f.type === 'count'
-      ? `<label>${esc(f.label)}<input type="number" id="f-${f.id}" min="0" step="any" placeholder="0"></label>`
+      ? `<label>${esc(f.label)}<input type="text" inputmode="decimal" autocomplete="off" id="f-${f.id}" placeholder="0"></label>`
       : f.type === 'select'
       ? `<label>${esc(f.label)}<select id="f-${f.id}">${(f.options || []).map(o => `<option value="${esc(o)}"${o === lastPick[f.id] ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`
       : f.type === 'number'
-      ? `<label>${esc(f.label)}<input type="number" id="f-${f.id}" min="1" step="1" value="1" required></label>`
+      ? `<label>${esc(f.label)}<input type="text" inputmode="decimal" autocomplete="off" id="f-${f.id}" value="1" required></label>`
       : `<label>${esc(f.label)}<input type="text" id="f-${f.id}" placeholder="${esc(f.placeholder || '')}" ${f.required ? 'required' : ''} ${f.suggest ? `list="dl-${f.id}"` : ''}>${f.suggest ? `<datalist id="dl-${f.id}"></datalist>` : ''}</label>`;
     // First line: the date plus any field marked "top"; everything else goes below.
     // Keep the location button and box safe while the form is rebuilt.
@@ -712,6 +736,8 @@
           `<div class="full drop-actions drop-total-wrap"><div class="drop-total" id="dropTotal"></div><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
         : cfg.fields.filter(f => !f.top).map(fieldHtml).join('') + `<button type="button" class="primary" data-submit>Add</button>` +
           (current === 'crafting' ? `<div class="full drop-total-wrap"><div class="drop-total" id="craftCalc"></div></div>` : ''));
+    // Farming starts with 5 character lines.
+    if (current === 'farming') for (let i = 1; i < 5; i++) $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
 
     const textFields = cfg.fields.filter(f => f.type !== 'number');
     $('historyHead').innerHTML = `<tr><th>Date</th><th>${esc(cfg.fields[0].label)}</th>${cfg.noQty ? '' : '<th class="num">Qty</th>'}` +
@@ -752,7 +778,7 @@
     const entry = { id: newId(), date: todayStr(), created: Date.now() };   // the day it was entered
     for (const f of cfg.fields) {
       const v = $('f-' + f.id).value;
-      entry[f.id] = f.type === 'number' ? parseInt(v, 10) : f.type === 'count' ? (parseFloat(v) || 0) : v.trim();
+      entry[f.id] = f.type === 'number' ? parseInt(noCommas(v), 10) : f.type === 'count' ? (parseFloat(noCommas(v)) || 0) : v.trim();
     }
     if (cfg.noQty) entry.qty = 1;   // each craft counts once in totals
     if (!entry.item || !(entry.qty > 0)) { notify('Fill in the item and a quantity of 1 or more.'); return; }
@@ -793,7 +819,7 @@
         <td>${esc(e.item)}</td>
         ${cfg.noQty ? '' : `<td class="num">${fmt(e.qty)}</td>`}
         ${textFields.slice(1).map(f => f.type === 'count' ? `<td class="num${f.divider ? ' yl-div' : ''}">${fmt(Number(e[f.id]) || 0)}</td>` : `<td class="${f.wide ? 'wrap-cell' : ''}">${esc(f.id === 'location' ? locationName(e.location) : e[f.id])}</td>`).join('')}
-        <td><button class="link edit-only minus-btn" data-del="${esc(e.id)}" title="Delete entry" aria-label="Delete entry">&minus;</button></td>
+        <td><button class="link edit-only minus-btn" data-del="${esc(e.id)}" title="Delete entry" aria-label="Delete entry">&times;</button></td>
       </tr>`).join('') : `<tr><td colspan="${cols}" class="empty">${esc(cfg.empty)}</td></tr>`;
 
     const totals = {};
@@ -860,7 +886,7 @@
       prices.push({ id: newId(), item, price, updated: date, category: category || '', prevPrice: null, prevUpdated: null, history: [{ date, price }] });
       return 'added';
     }
-    const h = historyOf(ex).map(x => ({ ...x })).filter(x => x.date !== date);
+    const h = historyOf(ex).map(x => ({ ...x })).filter(x => x.date !== date && x.price != null);
     h.push({ date, price });
     h.sort((a, b) => a.date.localeCompare(b.date));
     const latest = h[h.length - 1];
@@ -997,7 +1023,7 @@
   function tierInputs(p, editable) {
     const t = tiersOf(p);
     return `<div class="tiers">${TIERS[tierKey(p)].cols.map(c => editable
-      ? `<input class="cell num" type="number" min="0" step="any" data-id="${esc(p.id)}" data-field="tier" data-tier="${esc(c)}" value="${esc(t[c] ?? '')}" placeholder="&mdash;" aria-label="${esc(p.item)} ${esc(c)} price">`
+      ? `<input class="cell num" type="text" inputmode="decimal" autocomplete="off" data-id="${esc(p.id)}" data-field="tier" data-tier="${esc(c)}" value="${esc(withCommas(t[c]))}" placeholder="&mdash;" aria-label="${esc(p.item)} ${esc(c)} price">`
       : `<span>${t[c] != null ? fmtMoney(t[c]) : '&mdash;'}</span>`).join('')}</div>`;
   }
   // These always show on Prices, at the top in this order, whatever the sort.
@@ -1048,7 +1074,9 @@
     const focused = document.activeElement && document.activeElement.closest('#priceBody') ? document.activeElement : null;
     const keep = focused && focused.dataset.field ? { id: focused.dataset.id, field: focused.dataset.field, tier: focused.dataset.tier } : null;
     const editable = !document.body.classList.contains('readonly');
-    const cell = (p, field, type, extra = '') => `<input class="cell${type === 'number' ? ' num' : ''}" data-id="${esc(p.id)}" data-field="${field}" type="${type}" value="${esc(p[field] ?? '')}" ${extra}>`;
+    const cell = (p, field, type, extra = '') => type === 'number'
+      ? `<input class="cell num" data-id="${esc(p.id)}" data-field="${field}" type="text" inputmode="decimal" autocomplete="off" value="${esc(withCommas(p[field]))}" ${extra}>`
+      : `<input class="cell" data-id="${esc(p.id)}" data-field="${field}" type="${type}" value="${esc(p[field] ?? '')}" ${extra}>`;
     const catCell = p => `<td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}</td>`;
     // In the Ores section, show names without the word "ore" (stored name is unchanged).
     const shownName = p => tierKey(p) === 'ores' ? (p.item.replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || p.item) : p.item;
@@ -1067,7 +1095,7 @@
         <td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}</td>
         <td class="num w-price">${tierKey(p) ? tierInputs(p, editable) : editable ? cell(p, 'price', 'number', 'aria-label="Price" min="0" step="any"') : fmtMoney(p.price)}</td>
         <td class="w-date">${esc(fmtDate(p.updated))}</td>
-        <td class="actions"><button class="link edit" data-hist="${esc(p.id)}">History</button><button class="link edit-only minus-btn" data-pdel="${esc(p.id)}" title="Remove ${esc(p.item)}" aria-label="Remove ${esc(p.item)}">&minus;</button></td>
+        <td class="actions"><button class="link edit" data-hist="${esc(p.id)}">History</button><button class="link edit-only minus-btn" data-pdel="${esc(p.id)}" title="Remove ${esc(p.item)}" aria-label="Remove ${esc(p.item)}">&times;</button></td>
       </tr>`;
     };
     // Ores and Scrolls get their own sections, each with its own price columns.
@@ -1099,7 +1127,7 @@
     $('histBody').innerHTML = h.slice().reverse().map((x, i, arr) => {
       const older = arr[i + 1];
       return `<tr><td>${esc(fmtDate(x.date))}</td><td class="num">${fmtMoney(x.price)}</td><td class="num">${changeHtml(older ? x.price - older.price : null)}</td>
-        <td class="actions"><button class="link edit-only" data-hdate="${esc(x.date)}" title="Remove this price from the history">Remove</button></td></tr>`;
+        <td class="actions"><button class="link edit-only minus-btn" data-hdate="${esc(x.date)}" title="Remove this price from the history" aria-label="Remove this price from the history">&times;</button></td></tr>`;
     }).join('');
     if (h.length < 2) {
       $('histChart').innerHTML = '<p class="note">Only one price so far. The chart appears once this item has a price on a second date.</p>';
@@ -1130,7 +1158,7 @@
   // Add from the first row of the table.
   function addNewPrice() {
     const item = $('np-item').value.trim();
-    const price = parseFloat($('np-price').value);
+    const price = parseFloat(noCommas($('np-price').value));
     if (!item) { $('np-item').focus(); return; }
     if (!(price >= 0)) { $('np-price').focus(); return; }
     const existing = priceOf(item);
@@ -1171,7 +1199,7 @@
     if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
     if (e.key === 'Escape') {
       const p = prices.find(x => x.id === e.target.dataset.id) || {};
-      e.target.value = (e.target.dataset.field === 'tier' ? tiersOf(p)[e.target.dataset.tier] : p[e.target.dataset.field]) ?? '';
+      e.target.value = e.target.dataset.field === 'tier' ? withCommas(tiersOf(p)[e.target.dataset.tier]) : e.target.dataset.field === 'price' ? withCommas(p.price) : (p[e.target.dataset.field] ?? '');
       e.target.blur();
     }
   });
@@ -1190,7 +1218,7 @@
       return;
     }
     if (field === 'tier') {
-      const tier = el.dataset.tier, raw = el.value.trim(), v = raw === '' ? null : parseFloat(raw);
+      const tier = el.dataset.tier, raw = noCommas(el.value), v = raw === '' ? null : parseFloat(raw);
       if (v != null && !(v >= 0)) { renderPrices(); return; }
       let p = prices.find(x => x.id === el.dataset.id);
       if (!p) {
@@ -1215,7 +1243,7 @@
     }
     if (field === 'price' && String(el.dataset.id).startsWith('drop:')) {
       // A farming drop with no price yet: typing a price adds it to the list.
-      const price = parseFloat(el.value.trim());
+      const price = parseFloat(noCommas(el.value));
       if (!(price >= 0)) { el.value = ''; return; }
       const name = el.dataset.id.slice(5);
       upsertPrice(name, price, todayStr(), dropCats[sameName(name)] || '');
@@ -1241,7 +1269,7 @@
     } else if (field === 'category') {
       p.category = v;
     } else if (field === 'price') {
-      const price = parseFloat(v);
+      const price = parseFloat(noCommas(v));
       if (!(price >= 0)) { renderPrices(); return; }
       if (price === p.price) return;
       upsertPrice(p.item, price, todayStr(), '');
@@ -1326,7 +1354,9 @@
   const isMesos = n => sameName(n) === sameName('Mesos');
   const itemsOn = loc => (mapItems[sameName(loc || '')] || []).slice()
     .sort((a, b) => (isMesos(b) - isMesos(a)) || a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  const byNameLoc = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  // A to Z, but Wolf Spider always first (and so chosen by default).
+  const FIRST_LOCATION = 'Wolf Spider';
+  const byNameLoc = (a, b) => (sameName(b) === sameName(FIRST_LOCATION)) - (sameName(a) === sameName(FIRST_LOCATION)) || a.localeCompare(b, undefined, { sensitivity: 'base' });
 
   // Saved list plus any location an entry already uses; duplicates by capitals/spaces count once. A to Z.
   function allLocations() {
@@ -1403,9 +1433,31 @@
     sel.innerHTML = items.length
       ? items.map(c => `<option value="${esc(c)}">${esc(c.replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || c)}</option>`).join('')
       : `<option value="">No items in ${esc(CRAFT_CATEGORY)} yet</option>`;
+    sel.insertAdjacentHTML('beforeend', `<option value="${ADD_CRAFT}">+ New item...</option>`);
     sel.value = items.find(c => sameName(c) === sameName(chosen)) || items[0] || '';
     renderCraftCalc();
   }
+  // "+ New item..." in the Crafting Item dropdown: adds the item to Prices in the Ores category (no price yet).
+  const ADD_CRAFT = '__addcraft__';
+  $('entryForm').addEventListener('change', async e => {
+    const sel = e.target;
+    if (sel.id !== 'f-item' || sel.value !== ADD_CRAFT) { if (sel.id === 'f-item') sel.dataset.prev = sel.value; return; }
+    const name = String(await askText('New item name') || '').trim().replace(/\s+/g, ' ');
+    if (!name) { sel.value = sel.dataset.prev || ''; renderCraftCalc(); return; }
+    const ex = priceOf(name);
+    if (ex && ex.category && sameName(ex.category) !== sameName(CRAFT_CATEGORY)) {
+      notify(`${ex.item} is already in Prices under ${ex.category}. Change its category to ${CRAFT_CATEGORY} to craft it.`);
+      sel.value = sel.dataset.prev || ''; renderCraftCalc(); return;
+    }
+    if (ex) { ex.category = CRAFT_CATEGORY; notify(`${ex.item} is already in Prices.`); }
+    else prices.push({ id: newId(), item: name, price: null, updated: todayStr(), category: CRAFT_CATEGORY, prevPrice: null, prevUpdated: null, history: [] });
+    savePrices();
+    sel.dataset.prev = '';
+    renderCraftItemSelect();
+    sel.value = ex ? ex.item : name;
+    sel.dataset.prev = sel.value;
+    renderCraftCalc();
+  });
   // Crafting calculation table: the Ore is crafted into Basic, Intermediate and Advanced.
   // Everything is converted to Advanced (1 Basic = 0.01 Advanced, 1 Intermediate = 0.1 Advanced) to get Advanced per Ore.
   const CRAFT_TIERS = [['basic', 'Basic', 0.01], ['intermediate', 'Intermediate', 0.1], ['advanced', 'Advanced', 1]];
@@ -1455,7 +1507,7 @@
       return `<tr class="run-row craft-row${open ? ' selected' : ''}" data-craft="${esc(g.key)}" title="Click to see each craft by date">
           <td>${esc(g.item)} <span class="muted-count">(${g.list.length})</span></td>${craftTotalCells(sum)}<td></td></tr>` +
         (open ? g.list.map((e, i) => `<tr class="craft-detail"><td>${esc(fmtDate(e.date))}</td>${craftTotalCells(each[i])}
-          <td><button class="link edit-only minus-btn" data-del="${esc(e.id)}" title="Delete entry" aria-label="Delete entry">&minus;</button></td></tr>`).join('') : '');
+          <td><button class="link edit-only minus-btn" data-del="${esc(e.id)}" title="Delete entry" aria-label="Delete entry">&times;</button></td></tr>`).join('') : '');
     });
     $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="7" class="empty">${esc(TABS.crafting.empty)}</td></tr>`;
   }
@@ -1463,7 +1515,7 @@
     const box = $('craftCalc');
     if (!box) return;
     const vals = {};
-    ['ore', ...CRAFT_TIERS.map(t => t[0])].forEach(id => { const el = $('f-' + id); vals[id] = el ? (parseFloat(el.value) || 0) : 0; });
+    ['ore', ...CRAFT_TIERS.map(t => t[0])].forEach(id => { const el = $('f-' + id); vals[id] = el ? (parseFloat(noCommas(el.value)) || 0) : 0; });
     const rows = CRAFT_TIERS.map(([id, label, rate]) => `<tr><td>${esc(label)}</td><td class="num">${fmt(vals[id])}</td><td class="num">${fmtRate(rate)}</td><td class="num">${fmtRate(vals[id] * rate)}</td></tr>`).join('');
     const item = $('f-item') ? $('f-item').value : '';
     const { adv } = craftTotals(vals, item, todayStr());
@@ -1520,7 +1572,7 @@
         <td class="num">${fmtWs(perHour([r], r.date))}</td>
         <td class="num yl-div">${fmtWs(wsOf(r, null))}</td>
         <td class="num">${fmtWs(perHour([r], null))}</td>
-        <td><button class="link edit-only minus-btn" data-delrun="${esc(r.key)}" title="Delete this run" aria-label="Delete this run">&minus;</button></td>
+        <td><button class="link edit-only minus-btn" data-delrun="${esc(r.key)}" title="Delete this run" aria-label="Delete this run">&times;</button></td>
       </tr>` + (open ? `<tr class="run-detail"><td colspan="8">${totalTableHtml(items, i => r.qty[i] || 0, r.date, r.duration)}</td></tr>` : '');
     };
     // One row per location / map (A-Z); click it to see each run by date (newest first).
@@ -1588,7 +1640,7 @@
       if (box.dataset.loc === loc) box.querySelectorAll('.drop-qty').forEach(i => { typed[i.dataset.item] = i.value; });
       box.dataset.loc = loc;
       box.innerHTML = items.length
-        ? items.map(c => `<label><span class="lbl">${esc(c)}</span><input type="number" class="drop-qty" data-item="${esc(c)}" aria-label="${esc(c)}" min="0" step="1" placeholder="0" value="${esc(typed[c] || '')}"></label>`).join('')
+        ? items.map(c => `<label><span class="lbl">${esc(c)}</span><input type="text" inputmode="decimal" autocomplete="off" class="drop-qty" data-item="${esc(c)}" aria-label="${esc(c)}" placeholder="0" value="${esc(typed[c] || '')}"></label>`).join('')
         : `<span class="note drops-empty">${loc ? 'No items on this map yet. Add them with Manage locations.' : 'Add a map with Manage locations first.'}</span>`;
     });
     renderDropTotal();
@@ -1637,7 +1689,7 @@
     const items = itemsOn($('f-location').value);
     if (!items.length) { box.innerHTML = ''; return; }
     const sum = item => [...document.querySelectorAll('#dropRows .drop-qty')]
-      .filter(i => i.dataset.item === item).reduce((t, i) => t + (parseInt(i.value, 10) || 0), 0);
+      .filter(i => i.dataset.item === item).reduce((t, i) => t + (parseInt(noCommas(i.value), 10) || 0), 0);
     box.innerHTML = totalTableHtml(items, sum, null, $('f-duration') ? $('f-duration').value : '');
   }
   // The TOTAL table for a list of items and a function giving each item's total (used by the Drop Table and History).
@@ -1701,7 +1753,7 @@
     document.querySelectorAll('#dropRows .drop-row').forEach(row => {
       const character = row.querySelector('.drop-char').value.trim();
       row.querySelectorAll('.drop-qty').forEach(i => {
-        const qty = parseInt(i.value, 10);
+        const qty = parseInt(noCommas(i.value), 10);
         if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, chars, character, location, duration, item: i.dataset.item, qty });
       });
     });
@@ -1732,7 +1784,7 @@
     // Custom list so each map can have a remove (-) button, plus "Add Map" at the end.
     $('locMenu').innerHTML = locs.map(c => `<div class="map-opt${c === pick.value ? ' on' : ''}">
         <button type="button" class="map-name" data-pick="${esc(c)}">${esc(c)}</button>
-        <button type="button" class="map-minus" data-locdel="${esc(c)}" title="Remove ${esc(c)}" aria-label="Remove ${esc(c)}">&minus;</button>
+        <button type="button" class="map-minus" data-locdel="${esc(c)}" title="Remove ${esc(c)}" aria-label="Remove ${esc(c)}">&times;</button>
       </div>`).join('') + `<button type="button" class="map-add" data-addmap="1">+ Add Map</button>`;
     const items = itemsOn(pick.value);
     $('locItemList').innerHTML = !pick.value ? '<span class="note">No maps yet. Open the list above and choose Add Map.</span>'
