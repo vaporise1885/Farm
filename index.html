@@ -161,6 +161,7 @@
     .sess-map:first-child { margin-top: 0; }
     .sess-total { margin-top: 12px; padding-top: 10px; border-top: 2px solid var(--hl-border); }
     .drop-row.no-loot .drops { display: none; }
+    .blk-counts { margin-left: 12px; }
     .looter-box { width: 46px !important; display: flex; flex-direction: column; align-items: center; }
     .looter-box input { width: 18px; height: 18px; margin: 11px 0; accent-color: var(--hl-border); }
     .top-row label.chars-box { width: 90px; }
@@ -832,8 +833,8 @@
     if (current === 'farming') {
       for (let i = 1; i < 5; i++) $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
       $('f-duration').closest('label').insertAdjacentHTML('afterend',
-        `<label class="chars-box">Hitters<input type="text" inputmode="numeric" autocomplete="off" id="f-mages" placeholder="0" value="${esc(lastPick.mages || '')}" aria-label="Number of hitters"></label>` +
-        `<label class="chars-box">Looters<input type="text" inputmode="numeric" autocomplete="off" id="f-looters" placeholder="0" value="${esc(lastPick.looters || '')}" aria-label="Number of looters"></label>`);
+        `<label class="chars-box">Hitters<input type="text" inputmode="numeric" autocomplete="off" id="f-mages" placeholder="0" readonly tabindex="-1" class="auto-date" title="All maps added up, from the Looter ticks" aria-label="Number of hitters"></label>` +
+        `<label class="chars-box">Looters<input type="text" inputmode="numeric" autocomplete="off" id="f-looters" placeholder="0" readonly tabindex="-1" class="auto-date" title="All maps added up, from the Looter ticks" aria-label="Number of looters"></label>`);
       syncLootCounts();
     }
 
@@ -2110,8 +2111,8 @@
         <td>${esc(fmtDate(r0.date))}</td>
         <td>${rs.map(r => esc(locationName(r.location) || '(no map)')).join(', ')}</td>
         <td>${r0.duration ? esc(r0.duration) : '&mdash;'}</td>
-        <td class="num">${r0.mages == null ? '&mdash;' : fmt(r0.mages)}</td>
-        <td class="num">${r0.looters == null ? '&mdash;' : fmt(r0.looters)}</td>
+        <td class="num">${rs.every(r => r.mages == null) ? '&mdash;' : fmt(rs.reduce((t, r) => t + (r.mages || 0), 0))}</td>
+        <td class="num">${rs.every(r => r.looters == null) ? '&mdash;' : fmt(rs.reduce((t, r) => t + (r.looters || 0), 0))}</td>
         <td class="num">${fmt(rs.reduce((t, r) => t + charsOf(r), 0))}</td>
         <td class="num">${fmtWs(then)}</td>
         <td class="num">${then == null || !hrs ? '&mdash;' : fmtWs(then / hrs)}</td>
@@ -2297,15 +2298,14 @@
   function addFarmingRun() {
     const duration = $('f-duration') ? $('f-duration').value : '';
     const created = Date.now(), session = newId();
-    const num = id => { const v = parseInt(noCommas(($(id) || {}).value || ''), 10); return v >= 0 ? v : null; };
-    const mages = num('f-mages'), looters = num('f-looters');
     const added = [];
     // Each map is saved as its own run, all sharing one session id (so History lists it under its location).
     mapBlocks().forEach(block => {
       const location = blockLoc(block), run = newId();
       const rows = [...block.querySelectorAll('.drop-row')];
-      // Count every line that has a number. On the first map, also lines with just a name (as before).
-      const chars = rows.filter(row => (block.dataset.main && row.querySelector('.drop-char').value.trim()) || [...row.querySelectorAll('.drop-qty')].some(i => i.value !== '')).length;
+      // Each map keeps its own counts: Looters = ticked lines, Hitters = unticked lines, Characters = both.
+      const looters = rows.filter(r => r.querySelector('.drop-looter').checked).length;
+      const mages = rows.length - looters, chars = rows.length;
       rows.forEach(row => {
         const character = row.querySelector('.drop-char').value.trim();
         const looter = !!(row.querySelector('.drop-looter') || {}).checked;
@@ -2331,11 +2331,18 @@
   }
   $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-location' || e.target.classList.contains('map-loc')) renderItemSelect(); });
   // Looter ticked (the default) = this character picks up drops. Unticked = a hitter: no item boxes, and Hitters / Looters are counted from the ticks.
+  // The boxes at the top show the whole session (all maps added up); each map shows its own counts under its lines.
   function syncLootCounts() {
     if (!$('f-looters')) return;
     const boxes = [...document.querySelectorAll('.drop-rows .drop-looter')];
     $('f-looters').value = boxes.filter(b => b.checked).length;
     $('f-mages').value = boxes.filter(b => !b.checked).length;
+    mapBlocks().forEach(block => {
+      const bx = [...block.querySelectorAll('.drop-looter')], l = bx.filter(b => b.checked).length;
+      let el = block.querySelector('.blk-counts');
+      if (!el) { el = document.createElement('span'); el.className = 'blk-counts muted-count'; block.querySelector('.add-char-btn').after(el); }
+      el.textContent = `This map: ${bx.length - l} hitter${bx.length - l === 1 ? '' : 's'}, ${l} looter${l === 1 ? '' : 's'}`;
+    });
   }
   $('entryForm').addEventListener('change', e => {
     if (!e.target.classList.contains('drop-looter')) return;
