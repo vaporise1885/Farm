@@ -813,7 +813,7 @@
   const HEADER_TIPS = {
     'farm-total': {
       'Total': 'Added up across every character line for this item.',
-      'Average Craft': 'Ores only. From Crafting history for this ore: Total Advanced ÷ Ores used (1 Basic = 0.01 Advanced, 1 Intermediate = 0.1 Advanced).',
+      'Average Craft': 'Ores only. From Crafting history for this ore: Total Advanced ÷ Ores used, shown as a % (1 Basic = 0.01 Advanced, 1 Intermediate = 0.1 Advanced).',
       'Advanced Ore': 'Ores only. Total × Average Craft.',
       'Price': 'From Prices (ores use their Advanced price). Drop Table: latest price. History breakdown: the price on the run\'s date.',
       'White Scroll': 'Ores: Advanced Ore × Price ÷ White Scroll price. Everything else (Mesos too): Total × Price ÷ White Scroll price.',
@@ -836,14 +836,14 @@
     'craft': {
       'Ores used': 'The Ore number entered.',
       'Total Advanced': 'Basic × 0.01 + Intermediate × 0.1 + Advanced.',
-      'Average Craft': 'Total Advanced ÷ Ores used.',
+      'Average Craft': 'Total Advanced ÷ Ores used, shown as a %.',
       'White Scroll (Then)': 'Total Advanced × the ore\'s Advanced price on the craft date ÷ White Scroll price on that date.',
       'White Scroll (Now)': 'Total Advanced × the ore\'s latest Advanced price ÷ latest White Scroll price.'
     },
     'craft-hist': {
       'Ores used': 'Date row: the Ore number. Item row: all its crafts added up.',
       'Total Advanced': 'Basic × 0.01 + Intermediate × 0.1 + Advanced. Item row: all its crafts added up.',
-      'Average Craft': 'Total Advanced ÷ Ores used. Farming uses the item row\'s figure.',
+      'Average Craft': 'Total Advanced ÷ Ores used, shown as a %. Farming uses the item row\'s figure.',
       'White Scroll (Then)': 'Total Advanced × the ore\'s Advanced price on the craft date ÷ White Scroll price on that date. Item row: average of its crafts.',
       'White Scroll (Now)': 'Date row: Total Advanced × latest Advanced price ÷ latest White Scroll price. Item row: Average Craft × average Ores used per craft × latest Advanced price ÷ latest White Scroll price.'
     }
@@ -1580,7 +1580,7 @@
   const CRAFT_TOTAL_HEADS = `<th class="nw-th num">Ores used</th><th class="nw-th num">Total Advanced</th><th class="nw-th num">Average Craft</th>
     <th class="nw-th num yl-div">White Scroll (Then)</th><th class="nw-th num yl-div">White Scroll (Now)</th>`;
   const craftTotalCells = t => {
-    return `<td class="num">${fmt(t.ore)}</td><td class="num">${fmtRate(t.adv)}</td><td class="num">${t.perOre == null ? '&mdash;' : fmtRate(t.perOre)}</td>
+    return `<td class="num">${fmt(t.ore)}</td><td class="num">${fmtRate(t.adv)}</td><td class="num">${t.perOre == null ? '&mdash;' : fmtPct(t.perOre)}</td>
       <td class="num yl-div">${fmtWs(t.wsThen)}</td><td class="num yl-div">${fmtWs(t.wsNow)}</td>`;
   };
   // Crafting history: one row per item; click it to see that item's crafts by date.
@@ -1777,6 +1777,8 @@
   // With a date, the price on that date (History breakdown = Then); without, the latest price.
   const priceCell = (name, date) => { const v = date ? priceOn(name, date) : latestPrice(name); return v == null ? '&mdash;' : fmtMoney(v); };
   // Average Craft = Advanced per Ore across all Crafting history for this item (null if never crafted).
+  // Average Craft shows as a percentage with 3 decimals, e.g. 0.0812 -> 8.120%.
+  function fmtPct(v) { return (v * 100).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + '%'; }
   const avgCraftOf = name => {
     let adv = 0, ore = 0;
     data.crafting.forEach(e => { if (sameName(e.item || '') === sameName(name)) { adv += advancedEquiv(e); ore += Number(e.ore) || 0; } });
@@ -1796,7 +1798,7 @@
   }
   const fmtWs = v => v == null ? '&mdash;' : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
   // Item row cells after Total: Average Craft, Advanced Ore (no calculation yet), Price, White Scroll. Total White Scroll is one shared cell (see below).
-  const totExtra = (name, total, date) => (!isOreItem(name) ? TOT_BLANK + TOT_BLANK : `<td class="num">${fmtWs(avgCraftOf(name))}</td>` + `<td class="num">${fmtWs(advancedOreOf(name, total))}</td>`) + `<td class="num">${priceCell(name, date)}</td><td class="num">${fmtWs(whiteScrollOf(name, total, date))}</td>`;
+  const totExtra = (name, total, date) => (!isOreItem(name) ? TOT_BLANK + TOT_BLANK : `<td class="num">${avgCraftOf(name) == null ? '&mdash;' : fmtPct(avgCraftOf(name))}</td>` + `<td class="num">${fmtWs(advancedOreOf(name, total))}</td>`) + `<td class="num">${priceCell(name, date)}</td><td class="num">${fmtWs(whiteScrollOf(name, total, date))}</td>`;
   function renderDropTotal() {
     const box = $('dropTotal');
     if (!box) return;
