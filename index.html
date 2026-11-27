@@ -160,6 +160,13 @@
     .sess-map { font-weight: 700; margin: 12px 0 4px; color: var(--hl-border); }
     .sess-map:first-child { margin-top: 0; }
     .sess-total { margin-top: 12px; padding-top: 10px; border-top: 2px solid var(--hl-border); }
+    .drop-row.no-loot .drops { display: none; }
+    .looter-box { width: 46px !important; display: flex; flex-direction: column; align-items: center; }
+    .looter-box input { width: 18px; height: 18px; margin: 11px 0; accent-color: var(--hl-border); }
+    .top-row label.chars-box { width: 90px; }
+    .job-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .job-chip { display: inline-flex; align-items: center; gap: 4px; }
+    #charsBody select.char-job { min-width: 140px; }
     .map-block { display: flex; flex-direction: column; gap: 12px; }
     .extra-map { margin-top: 8px; padding-top: 16px; border-top: 2px dashed var(--hl-border); }
     .map-head { align-items: flex-end; }
@@ -246,6 +253,15 @@
     .modal p { margin: 0 0 18px; }
     .modal-input { margin: -6px 0 18px; }
     .modal .row { display: flex; justify-content: flex-end; gap: 10px; }
+    .edit-modal { max-width: 760px; max-height: 88vh; overflow: auto; }
+    .edit-modal h3 { margin: 0 0 14px; }
+    .edit-modal .ed-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
+    .edit-modal .ed-row label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); width: 150px; }
+    .edit-modal .ed-row label.ed-narrow { width: 90px; }
+    .edit-modal .ed-grid label { width: 110px; }
+    button.link.edit-btn { color: var(--accent) !important; font-size: 1rem; padding: 2px 6px; }
+    button.link.edit-btn:hover { opacity: .75; }
+    td.nowrap { white-space: nowrap; }
     .modal .ok.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.95rem; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 60; max-width: calc(100% - 32px); }
     .toast.show { opacity: 1; }
@@ -274,6 +290,7 @@
       <button class="tab" data-tab="farming">Farming</button>
       <button class="tab" data-tab="crafting">Crafting</button>
       <button class="tab" data-tab="prices">Prices</button>
+      <button class="tab" data-tab="characters">Characters</button>
     </nav>
     <div class="account" id="account" hidden>
       <div class="who" id="accountWho"></div>
@@ -357,7 +374,7 @@
           <h2>Session history</h2>
           <div class="table-scroll">
             <table>
-              <thead id="sessionHead"><tr><th>Date</th><th>Maps</th><th>Duration</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th></tr></thead>
+              <thead id="sessionHead"><tr><th>Date</th><th>Maps</th><th>Duration</th><th class="num">Hitters</th><th class="num">Looters</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th></tr></thead>
               <tbody id="sessionBody"></tbody>
             </table>
           </div>
@@ -419,6 +436,33 @@
         </div>
       </div>
 
+      <div id="charsView" hidden>
+        <div class="panel">
+          <h2>Characters</h2>
+          <div class="toolbar edit-only">
+            <input type="text" id="newChar" placeholder="New character name" aria-label="New character name">
+            <select id="newCharJob" aria-label="Job"></select>
+            <button type="button" class="primary" id="newCharAdd">Add</button>
+            <span class="spacer"></span>
+            <button type="button" id="jobToggle">Manage jobs</button>
+          </div>
+          <div id="jobManager" class="bulk edit-only" hidden>
+            <div class="toolbar">
+              <input type="text" id="newJob" placeholder="New job" aria-label="New job">
+              <button type="button" class="primary" id="newJobAdd">Add job</button>
+            </div>
+            <div id="jobList" class="job-list"></div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Character</th><th>Job</th><th class="num">Sessions</th><th class="num">Drops logged</th><th>Last farmed</th><th></th></tr></thead>
+              <tbody id="charsBody"></tbody>
+            </table>
+          </div>
+          <p class="note">These are the names in the Character dropdown on Farming, in this order. Removing a name keeps its past drops in History.</p>
+        </div>
+      </div>
+
       <!-- Backup tools are hidden now that data saves online. Remove "hidden" to show them again. -->
       <div class="panel" id="backupPanel" hidden>
         <h2>Backup</h2>
@@ -444,6 +488,16 @@
     <div class="row">
       <button type="button" id="modalCancel">Cancel</button>
       <button type="button" class="ok danger primary" id="modalOk">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="editBg" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+  <div class="modal edit-modal">
+    <h3 id="editTitle"></h3>
+    <div id="editBody"></div>
+    <div class="row">
+      <button type="button" id="editCancel">Cancel</button>
+      <button type="button" class="primary" id="editSave">Save</button>
     </div>
   </div>
 </div>
@@ -680,6 +734,8 @@
             locationList = meta && Array.isArray(meta.list) ? meta.list : null;
             mapItems = meta && meta.items && typeof meta.items === 'object' ? meta.items : {};
             characterList = meta && Array.isArray(meta.characters) ? meta.characters : null;
+            jobList = meta && Array.isArray(meta.jobs) ? meta.jobs : [];
+            charJobs = meta && meta.charJobs && typeof meta.charJobs === 'object' ? meta.charJobs : {};
             refreshCharSelects();
           }
           cloud.synced[col] = new Map(arr.map(x => [x.id, stable(x)]));
@@ -708,7 +764,7 @@
   });
 
   let current = 'farming';
-  try { const s = localStorage.getItem('gameTracker.tab'); if (TABS[s] || s === 'prices') current = s; } catch (e) {}
+  try { const s = localStorage.getItem('gameTracker.tab'); if (TABS[s] || s === 'prices' || s === 'characters') current = s; } catch (e) {}
 
   /* ---- Tabs ---- */
   $('tabs').addEventListener('click', e => {
@@ -723,8 +779,15 @@
   function buildTab() {
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === current));
     const isPrices = current === 'prices';
-    $('trackerView').hidden = isPrices;
+    $('trackerView').hidden = isPrices || current === 'characters';
     $('pricesView').hidden = !isPrices;
+    $('charsView').hidden = current !== 'characters';
+    if (current === 'characters') {
+      $('pageTitle').textContent = 'Characters';
+      $('pageSub').textContent = 'Your characters for the Farming Drop Table. ' + savedWhere() + '.';
+      renderCharacters();
+      return;
+    }
     $('csvBtn').textContent = isPrices ? 'Export prices as CSV' : 'Export this tab as CSV';
     $('clearBtn').textContent = isPrices ? 'Clear price list' : "Clear this tab's history";
     if (isPrices) {
@@ -765,8 +828,14 @@
           `<div class="full"><button type="button" class="add-char" id="addCraftRow">+ Add new ore</button></div>` +
           `<div class="full drop-actions drop-total-wrap"><div class="drop-total" id="craftCalc"></div><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
         : cfg.fields.filter(f => !f.top).map(fieldHtml).join('') + `<button type="button" class="primary" data-submit>Add</button>`);
-    // Farming starts with 5 character lines.
-    if (current === 'farming') for (let i = 1; i < 5; i++) $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
+    // Farming starts with 5 character lines. Mages and Looters boxes sit beside Duration (saved with the session).
+    if (current === 'farming') {
+      for (let i = 1; i < 5; i++) $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
+      $('f-duration').closest('label').insertAdjacentHTML('afterend',
+        `<label class="chars-box">Hitters<input type="text" inputmode="numeric" autocomplete="off" id="f-mages" placeholder="0" value="${esc(lastPick.mages || '')}" aria-label="Number of hitters"></label>` +
+        `<label class="chars-box">Looters<input type="text" inputmode="numeric" autocomplete="off" id="f-looters" placeholder="0" value="${esc(lastPick.looters || '')}" aria-label="Number of looters"></label>`);
+      syncLootCounts();
+    }
 
     const textFields = cfg.fields.filter(f => f.type !== 'number');
     $('historyHead').innerHTML = `<tr><th>Date</th><th>${esc(cfg.fields[0].label)}</th>${cfg.noQty ? '' : '<th class="num">Qty</th>'}` +
@@ -775,7 +844,7 @@
     if (current === 'crafting') $('historyHead').innerHTML = `<tr><th>Item</th>${CRAFT_TOTAL_HEADS}<th></th></tr>`;
     if (current === 'farming') {
       // Farming history: one row per run.
-      $('historyHead').innerHTML = `<tr><th>Location / map</th><th>Duration</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th><th></th></tr>`;
+      $('historyHead').innerHTML = `<tr><th>Location / map</th><th>Duration</th><th class="num">Hitters</th><th class="num">Looters</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th><th></th></tr>`;
       $('search').placeholder = 'Search location, character or item';
     }
     $('statValueBox').hidden = current !== 'farming';
@@ -840,6 +909,8 @@
       'White Scroll / Hour': 'Total White Scroll ÷ Duration in hours.'
     },
     'farm-hist': {
+      'Hitters': 'Date row: hitters in that run (unticked Looter lines). Location row: left blank, not added up.',
+      'Looters': 'Date row: looters in that run (ticked Looter lines). Location row: left blank, not added up.',
       'Duration': 'Date row: the run\'s Duration. Location row: all its runs added up.',
       'Characters': 'Date row: character lines in the run. Location row: average per run.',
       'White Scroll (Then)': 'The run\'s Total White Scroll using prices on the run\'s date. Location row: average per run.',
@@ -916,6 +987,8 @@
   window.addEventListener('scroll', hideTip, true);
 
   function render() {
+    if (current === 'characters') { renderCharacters(); return; }
+    if (current === 'prices') { renderPrices(); return; }
     const cfg = TABS[current];
     const list = data[current];
     const textFields = cfg.fields.filter(f => f.type !== 'number');
@@ -1263,7 +1336,7 @@
     $('histBody').innerHTML = h.slice().reverse().map((x, i, arr) => {
       const older = arr[i + 1];
       return `<tr><td>${esc(fmtDate(x.date))}</td><td class="num">${fmtMoney(x.price)}</td><td class="num">${changeHtml(older ? x.price - older.price : null)}</td>
-        <td class="actions"><button class="link edit-only minus-btn" data-hdate="${esc(x.date)}" title="Remove this price from the history" aria-label="Remove this price from the history">&times;</button></td></tr>`;
+        <td class="actions"><button class="link edit-only edit-btn" data-edithdate="${esc(x.date)}" title="Edit" aria-label="Edit">&#9998;</button><button class="link edit-only minus-btn" data-hdate="${esc(x.date)}" title="Remove this price from the history" aria-label="Remove this price from the history">&times;</button></td></tr>`;
     }).join('');
     if (h.length < 2) {
       $('histChart').innerHTML = '<p class="note">Only one price so far. The chart appears once this item has a price on a second date.</p>';
@@ -1491,6 +1564,119 @@
     renderPrices();
   });
   $('histClose').addEventListener('click', () => { historyId = null; renderPrices(); });
+
+  /* ---- Editing history (Farming runs, Crafting entries, Prices history) ---- */
+  let editOnSave = null;
+  function openEditor(title, html, onSave) {
+    $('editTitle').textContent = title;
+    $('editBody').innerHTML = html;
+    editOnSave = onSave;
+    $('editBg').classList.add('open');
+    const f = $('editBody').querySelector('input, select'); if (f) f.focus();
+  }
+  const closeEditor = () => { $('editBg').classList.remove('open'); editOnSave = null; };
+  $('editCancel').addEventListener('click', closeEditor);
+  $('editBg').addEventListener('keydown', e => { if (e.key === 'Escape') closeEditor(); });
+  $('editSave').addEventListener('click', () => { if (editOnSave && editOnSave() !== false) closeEditor(); });
+  const edVal = id => $('editBody').querySelector('#' + id).value;
+  const edNum = v => { const n = parseFloat(noCommas(v)); return n >= 0 ? n : 0; };
+  const numBox = (id, label, v, cls = '') => `<label class="${cls}">${label}<input type="text" inputmode="decimal" autocomplete="off" id="${id}" value="${esc(v == null ? '' : withCommas(v))}" placeholder="0"></label>`;
+  const optionList = (opts, chosen) => [...new Set(opts.concat(chosen ? [chosen] : []))].map(o => `<option value="${esc(o)}"${o === chosen ? ' selected' : ''}>${esc(o)}</option>`).join('');
+
+  // Prices history: change the date or the price of one entry.
+  $('histBody').addEventListener('click', e => {
+    const date = e.target.dataset.edithdate;
+    const p = prices.find(x => x.id === historyId);
+    if (!date || !p) return;
+    const h = historyOf(p), entry = h.find(x => x.date === date);
+    if (!entry) return;
+    openEditor(`Edit price: ${p.item}`, `<div class="ed-row"><label>Date<input type="date" id="ed-date" value="${esc(date)}"></label>${numBox('ed-price', 'Price', entry.price)}</div>`, () => {
+      const nd = edVal('ed-date'), np = parseFloat(noCommas(edVal('ed-price')));
+      if (!nd || !(np >= 0)) { notify('Enter a date and a price.'); return false; }
+      const wasLatest = h[h.length - 1] === entry;
+      const rest = h.filter(x => x !== entry && x.date !== nd).map(x => ({ ...x }));
+      rest.push({ date: nd, price: np });
+      rest.sort((a, b) => a.date.localeCompare(b.date));
+      const last = rest[rest.length - 1], prev = rest[rest.length - 2];
+      Object.assign(p, { history: rest, price: last.price, updated: last.date, prevPrice: prev ? prev.price : null, prevUpdated: prev ? prev.date : null });
+      // Tiered items keep their main column in step with the latest price.
+      if (tierKey(p) && (wasLatest || last.date === nd)) { const set = tierSetOf(p); if (set.main) p.tiers = { ...tiersOf(p), [set.main]: last.price }; }
+      savePrices(); renderPrices();
+    });
+  });
+
+  // Crafting: change one craft.
+  function editCraft(id) {
+    const e = data.crafting.find(x => x.id === id);
+    if (!e) return;
+    const ores = prices.filter(p => sameName(p.category || '') === sameName(CRAFT_CATEGORY) && !isPlate(p)).map(p => p.item).sort();
+    openEditor('Edit craft', `<div class="ed-row"><label>Date<input type="date" id="ed-date" value="${esc(e.date)}"></label>
+      <label>Item<select id="ed-item">${optionList(ores, e.item)}</select></label></div>
+      <div class="ed-row">${numBox('ed-ore', 'Ore', e.ore, 'ed-narrow')}${numBox('ed-basic', 'Basic', e.basic, 'ed-narrow')}${numBox('ed-intermediate', 'Intermediate', e.intermediate, 'ed-narrow')}${numBox('ed-advanced', 'Advanced', e.advanced, 'ed-narrow')}</div>`, () => {
+      if (!edVal('ed-date')) { notify('Enter a date.'); return false; }
+      Object.assign(e, { date: edVal('ed-date'), item: edVal('ed-item'), ore: edNum(edVal('ed-ore')), basic: edNum(edVal('ed-basic')),
+        intermediate: edNum(edVal('ed-intermediate')), advanced: edNum(edVal('ed-advanced')) });
+      save('crafting'); render();
+    });
+  }
+
+  // Farming: change a whole run (one map of a session): date, map, duration, mages, looters, characters and every quantity.
+  const DURATIONS = (TABS.farming.fields.find(f => f.id === 'duration') || {}).options || [];
+  function editRun(key) {
+    const es = data.farming.filter(x => (x.run || x.id) === key).sort((a, b) => (a.created || 0) - (b.created || 0));
+    if (!es.length) return;
+    const f = es[0];
+    // One line per character in the run, plus one empty line to add someone.
+    const lines = [];
+    es.forEach(x => {
+      let l = lines.find(y => y.character === (x.character || ''));
+      if (!l) { l = { character: x.character || '', looter: !!x.looter, qty: {} }; lines.push(l); }
+      l.qty[x.item] = (l.qty[x.item] || 0) + (x.qty || 0);
+    });
+    lines.push({ character: '', qty: {} });
+    const gridHtml = loc => {
+      const items = [...new Set([...itemsOn(loc), ...es.map(x => x.item)])];
+      return lines.map((l, i) => `<div class="ed-row ed-grid" data-line="${i}"><label>Character<select class="ed-char"><option value="">&mdash;</option>${optionList(allCharacters(), l.character)}</select></label>` +
+        `<label class="looter-box">Looter<input type="checkbox" class="ed-looter"${l.looter ? ' checked' : ''}></label>` +
+        items.map(it => `<label>${esc(it)}<input type="text" inputmode="decimal" autocomplete="off" class="ed-qty" data-item="${esc(it)}" value="${esc(l.qty[it] ? withCommas(l.qty[it]) : '')}" placeholder="0"></label>`).join('') + '</div>').join('');
+    };
+    // Keep what was typed when the map changes.
+    const readGrid = () => $('editBody').querySelectorAll('.ed-grid').forEach(row => {
+      const l = lines[+row.dataset.line];
+      l.character = row.querySelector('.ed-char').value;
+      l.looter = row.querySelector('.ed-looter').checked;
+      row.querySelectorAll('.ed-qty').forEach(i => { const v = edNum(i.value); if (v) l.qty[i.dataset.item] = v; else delete l.qty[i.dataset.item]; });
+    });
+    openEditor(`Edit run: ${locationName(f.location) || '(no map)'}`, `<div class="ed-row"><label>Date<input type="date" id="ed-date" value="${esc(f.date)}"></label>
+      <label>Location / map<select id="ed-loc">${optionList(allLocations(), locationName(f.location) || f.location || '')}</select></label>
+      <label class="ed-narrow">Duration<select id="ed-dur"><option value="">&mdash;</option>${optionList(DURATIONS, f.duration || '')}</select></label>
+      ${numBox('ed-mages', 'Hitters', f.mages, 'ed-narrow')}${numBox('ed-looters', 'Looters', f.looters, 'ed-narrow')}${numBox('ed-chars', 'Characters', f.chars, 'ed-narrow')}</div>
+      <div id="ed-grid">${gridHtml(f.location)}</div>`, () => {
+      readGrid();
+      if (!edVal('ed-date')) { notify('Enter a date.'); return false; }
+      const location = edVal('ed-loc'), duration = edVal('ed-dur'), date = edVal('ed-date');
+      const opt = id => { const v = edVal(id).trim(); return v === '' ? null : edNum(v); };
+      const chars = opt('ed-chars') || lines.filter(l => l.character || Object.keys(l.qty).length).length;
+      const base = { run: f.run || key, session: f.session || '', chars, mages: opt('ed-mages'), looters: opt('ed-looters'), location, duration, date };
+      const added = [];
+      lines.forEach(l => Object.entries(l.qty).forEach(([item, qty]) => {
+        if (qty > 0) added.push({ id: newId(), created: (f.created || Date.now()) + added.length, ...base, character: l.character, looter: !!l.looter, item, qty });
+      }));
+      if (!added.length) { notify('Enter a quantity for at least one item, or delete the run instead.'); return false; }
+      if (!base.session) delete base.session;
+      added.forEach(a => { if (!a.session) delete a.session; });
+      data.farming = data.farming.filter(x => (x.run || x.id) !== key).concat(added);
+      save('farming'); render();
+    });
+    $('ed-loc').addEventListener('change', () => { readGrid(); $('ed-grid').innerHTML = gridHtml($('ed-loc').value); });
+  }
+  $('historyBody').addEventListener('click', e => {
+    const b = e.target.closest('.edit-btn');
+    if (!b) return;
+    e.stopPropagation();
+    if (b.dataset.editrun) editRun(b.dataset.editrun);
+    else if (b.dataset.editcraft) editCraft(b.dataset.editcraft);
+  }, true);
   $('p-search').addEventListener('input', renderPrices);
   $('p-cat').addEventListener('change', renderPrices);
 
@@ -1511,6 +1697,10 @@
   let characterList = null;
   try { const c = JSON.parse(localStorage.getItem(CHAR_KEY)); if (Array.isArray(c)) characterList = c; } catch (e) {}
   const allCharacters = () => characterList || DEFAULT_CHARACTERS;
+  // Jobs: a list managed on the Characters page, and each character's job (keyed by name, capitals/spaces ignored).
+  const JOBS_KEY = 'charJobs.v1';
+  let jobList = [], charJobs = {};
+  try { const j = JSON.parse(localStorage.getItem(JOBS_KEY)); if (j && Array.isArray(j.jobs)) { jobList = j.jobs; charJobs = j.charJobs || {}; } } catch (e) {}
   try { const m = JSON.parse(localStorage.getItem(MAP_ITEMS_KEY)); if (m && typeof m === 'object') mapItems = m; } catch (e) {}
   // A to Z, except Mesos always comes first.
   const isMesos = n => sameName(n) === sameName('Mesos');
@@ -1530,20 +1720,99 @@
   function locationName(v) {
     return v ? (allLocations().find(c => sameName(c) === sameName(v)) || v) : '';
   }
+  // Characters page: the character list with how often each one has farmed.
+  function renderCharacters() {
+    const body = $('charsBody');
+    if (!body) return;
+    const nj = $('newCharJob'), was = nj.value;
+    nj.innerHTML = '<option value="">Job</option>' + jobList.map(j => `<option>${esc(j)}</option>`).join('');
+    nj.value = jobList.includes(was) ? was : '';
+    $('jobList').innerHTML = jobList.length
+      ? jobList.map(j => `<span class="chip job-chip">${esc(j)} <button type="button" class="link minus-btn" data-jobdel="${esc(j)}" title="Remove ${esc(j)}" aria-label="Remove ${esc(j)}">&times;</button></span>`).join('')
+      : '<span class="note">No jobs yet. Add one above.</span>';
+    const editable = !document.body.classList.contains('readonly');
+    const list = allCharacters();
+    body.innerHTML = list.length ? list.map(c => {
+      const mine = data.farming.filter(e => sameName(e.character || '') === sameName(c));
+      const sessions = new Set(mine.map(e => e.session || e.run || e.id)).size;
+      const last = mine.reduce((d, e) => (e.date > d ? e.date : d), '');
+      const job = charJobs[sameName(c)] || '';
+      const jobCell = editable
+        ? `<select class="cell char-job" data-char="${esc(c)}" aria-label="Job for ${esc(c)}"><option value="">&mdash;</option>${[...new Set(jobList.concat(job ? [job] : []))].map(j => `<option${j === job ? ' selected' : ''}>${esc(j)}</option>`).join('')}</select>`
+        : (job ? esc(job) : '&mdash;');
+      return `<tr><td>${esc(c)}</td><td>${jobCell}</td><td class="num">${fmt(sessions)}</td><td class="num">${fmt(mine.length)}</td><td>${last ? esc(fmtDate(last)) : '&mdash;'}</td>
+        <td>${editable ? `<button class="link minus-btn" data-chardel="${esc(c)}" title="Remove ${esc(c)}" aria-label="Remove ${esc(c)}">&times;</button>` : ''}</td></tr>`;
+    }).join('') : '<tr><td colspan="6" class="empty">No characters yet. Add one above.</td></tr>';
+  }
+  function addCharacterFromPage() {
+    const name = $('newChar').value.trim().replace(/\s+/g, ' ');
+    if (!name) { $('newChar').focus(); return; }
+    const have = allCharacters().find(c => sameName(c) === sameName(name));
+    if (have) { notify(`${have} is already on the list.`); return; }
+    characterList = allCharacters().concat(name);
+    if ($('newCharJob').value) charJobs = { ...charJobs, [sameName(name)]: $('newCharJob').value };
+    saveLocations();
+    $('newChar').value = '';
+    renderCharacters();
+    $('newChar').focus();
+  }
+  $('newCharAdd').addEventListener('click', addCharacterFromPage);
+  $('jobToggle').addEventListener('click', () => { $('jobManager').hidden = !$('jobManager').hidden; if (!$('jobManager').hidden) $('newJob').focus(); });
+  function addJob() {
+    const name = $('newJob').value.trim().replace(/\s+/g, ' ');
+    if (!name) { $('newJob').focus(); return; }
+    const have = jobList.find(j => sameName(j) === sameName(name));
+    if (have) { notify(`${have} is already on the list.`); return; }
+    jobList = jobList.concat(name).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    saveLocations();
+    $('newJob').value = '';
+    renderCharacters();
+    $('newJob').focus();
+  }
+  $('newJobAdd').addEventListener('click', addJob);
+  $('newJob').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addJob(); } });
+  $('jobList').addEventListener('click', async e => {
+    const j = e.target.dataset.jobdel;
+    if (!j) return;
+    const used = Object.values(charJobs).filter(x => x === j).length;
+    if (!(await ask(`Remove the job ${j}?` + (used ? ` ${used} character${used === 1 ? '' : 's'} will have no job.` : '')))) return;
+    jobList = jobList.filter(x => x !== j);
+    const next = { ...charJobs };
+    for (const k in next) if (next[k] === j) delete next[k];
+    charJobs = next;
+    saveLocations();
+    renderCharacters();
+  });
+  $('charsBody').addEventListener('change', e => {
+    const c = e.target.dataset.char;
+    if (!c || !e.target.classList.contains('char-job')) return;
+    const next = { ...charJobs };
+    if (e.target.value) next[sameName(c)] = e.target.value; else delete next[sameName(c)];
+    charJobs = next;
+    saveLocations();
+  });
+  $('newChar').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCharacterFromPage(); } });
+  $('charsBody').addEventListener('click', async e => {
+    const n = e.target.dataset.chardel;
+    if (!n || !(await ask(`Remove ${n} from your characters? Past drops stay in History.`))) return;
+    characterList = allCharacters().filter(c => c !== n);
+    saveLocations();
+    renderCharacters();
+  });
   async function saveLocations() {
     if (cloud.on) {
       if (!cloud.user) { notify('Sign in to save changes.'); return; }
       try {
         const { doc, writeBatch } = cloud.fs;
         const batch = writeBatch(cloud.db);
-        batch.set(doc(cloud.db, 'farming', LOC_DOC), { id: LOC_DOC, item: LOC_DOC, list: locationList || allLocations(), items: mapItems, characters: allCharacters() });
+        batch.set(doc(cloud.db, 'farming', LOC_DOC), { id: LOC_DOC, item: LOC_DOC, list: locationList || allLocations(), items: mapItems, characters: allCharacters(), jobs: jobList, charJobs });
         await batch.commit();
       } catch (e) {
         notify(e.code === 'permission-denied' ? "This account isn't allowed to make changes." : 'Could not save online: ' + e.message);
       }
       return;
     }
-    try { localStorage.setItem(LOC_KEY, JSON.stringify(locationList || allLocations())); localStorage.setItem(MAP_ITEMS_KEY, JSON.stringify(mapItems)); localStorage.setItem(CHAR_KEY, JSON.stringify(allCharacters())); }
+    try { localStorage.setItem(LOC_KEY, JSON.stringify(locationList || allLocations())); localStorage.setItem(MAP_ITEMS_KEY, JSON.stringify(mapItems)); localStorage.setItem(CHAR_KEY, JSON.stringify(allCharacters())); localStorage.setItem(JOBS_KEY, JSON.stringify({ jobs: jobList, charJobs })); }
     catch (e) { notify('Could not save. Your browser may be blocking storage.'); }
   }
   function addLocation(name) {
@@ -1699,7 +1968,7 @@
       return `<tr class="run-row craft-row${open ? ' selected' : ''}" data-craft="${esc(g.key)}" title="Click to see each craft by date">
           <td>${esc(g.item)} <span class="muted-count">(${g.list.length})</span></td>${craftTotalCells(sum)}<td></td></tr>` +
         (open ? g.list.map((e, i) => `<tr class="craft-detail"><td>${esc(fmtDate(e.date))}</td>${craftTotalCells(each[i])}
-          <td><button class="link edit-only minus-btn" data-del="${esc(e.id)}" title="Delete entry" aria-label="Delete entry">&times;</button></td></tr>`).join('') : '');
+          <td class="nowrap"><button class="link edit-only edit-btn" data-editcraft="${esc(e.id)}" title="Edit" aria-label="Edit">&#9998;</button><button class="link edit-only minus-btn" data-del="${esc(e.id)}" title="Delete entry" aria-label="Delete entry">&times;</button></td></tr>`).join('') : '');
     });
     $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="7" class="empty">${esc(TABS.crafting.empty)}</td></tr>`;
   }
@@ -1740,7 +2009,7 @@
     const runs = new Map();
     entries.forEach(e => {
       const key = e.run || e.id;
-      if (!runs.has(key)) runs.set(key, { key, session: e.session || '', date: e.date, created: e.created, location: e.location, duration: e.duration || '', chars: e.chars, names: new Set(), qty: {} });
+      if (!runs.has(key)) runs.set(key, { key, session: e.session || '', date: e.date, created: e.created, location: e.location, duration: e.duration || '', chars: e.chars, mages: e.mages, looters: e.looters, names: new Set(), qty: {} });
       const r = runs.get(key);
       if (e.character) r.names.add(sameName(e.character));
       if (e.item) r.qty[e.item] = (r.qty[e.item] || 0) + (e.qty || 0);
@@ -1788,13 +2057,15 @@
       return `<tr class="run-row loc-detail${open ? ' selected' : ''}" data-run="${esc(r.key)}" title="Click to see the breakdown">
         <td>${esc(fmtDate(r.date))}${others.length ? ` <span class="muted-count">with ${others.map(x => esc(locationName(x.location) || '(no map)')).join(', ')}</span>` : ''}</td>
         <td>${r.duration ? esc(r.duration) : '&mdash;'}</td>
+        <td class="num">${r.mages == null ? '&mdash;' : fmt(r.mages)}</td>
+        <td class="num">${r.looters == null ? '&mdash;' : fmt(r.looters)}</td>
         <td class="num">${fmt(charsOf(r))}</td>
         <td class="num">${fmtWs(wsOf(r, r.date))}</td>
         <td class="num">${fmtWs(perHour([r], r.date))}</td>
         <td class="num yl-div">${fmtWs(wsOf(r, null))}</td>
         <td class="num">${fmtWs(perHour([r], null))}</td>
-        <td><button class="link edit-only minus-btn" data-delrun="${esc(r.key)}" title="Delete this run" aria-label="Delete this run">&times;</button></td>
-      </tr>` + (open ? `<tr class="run-detail"><td colspan="8">${runDetail(r)}</td></tr>` : '');
+        <td class="nowrap"><button class="link edit-only edit-btn" data-editrun="${esc(r.key)}" title="Edit" aria-label="Edit">&#9998;</button><button class="link edit-only minus-btn" data-delrun="${esc(r.key)}" title="Delete this run" aria-label="Delete this run">&times;</button></td>
+      </tr>` + (open ? `<tr class="run-detail"><td colspan="10">${runDetail(r)}</td></tr>` : '');
     };
     // One row per location / map (A-Z); click it to see each run by date (newest first).
     // Location row: number of runs, total duration, average characters, and average White Scroll per run.
@@ -1812,6 +2083,7 @@
       return `<tr class="loc-row${open ? ' selected' : ''}" data-loc="${esc(g.key)}" title="Click to see each run by date">
         <td>${esc(g.name)} <span class="muted-count">(${g.runs.length})</span></td>
         <td>${fmtMins(g.runs.reduce((t, r) => t + mins(r.duration), 0))}</td>
+        <td></td><td></td>
         <td class="num">${avgChars == null ? '&mdash;' : avgChars.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
         <td class="num">${fmtWs(avg(g.runs.map(r => wsOf(r, r.date))))}</td>
         <td class="num">${fmtWs(perHour(g.runs, 'then'))}</td>
@@ -1820,7 +2092,7 @@
         <td></td>
       </tr>` + (open ? g.runs.map(runRow).join('') : '');
     });
-    $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="8" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
+    $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="10" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
 
     // Session history: one row per Add (all maps saved together), newest first. Runs saved before sessions existed count as their own session.
     const sessions = new Map();
@@ -1838,13 +2110,15 @@
         <td>${esc(fmtDate(r0.date))}</td>
         <td>${rs.map(r => esc(locationName(r.location) || '(no map)')).join(', ')}</td>
         <td>${r0.duration ? esc(r0.duration) : '&mdash;'}</td>
+        <td class="num">${r0.mages == null ? '&mdash;' : fmt(r0.mages)}</td>
+        <td class="num">${r0.looters == null ? '&mdash;' : fmt(r0.looters)}</td>
         <td class="num">${fmt(rs.reduce((t, r) => t + charsOf(r), 0))}</td>
         <td class="num">${fmtWs(then)}</td>
         <td class="num">${then == null || !hrs ? '&mdash;' : fmtWs(then / hrs)}</td>
         <td class="num yl-div">${fmtWs(now)}</td>
         <td class="num">${now == null || !hrs ? '&mdash;' : fmtWs(now / hrs)}</td>
-      </tr>` + (open ? `<tr class="run-detail"><td colspan="8">${runDetail(r0)}</td></tr>` : '');
-    }).join('') : `<tr><td colspan="8" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
+      </tr>` + (open ? `<tr class="run-detail"><td colspan="10">${runDetail(r0)}</td></tr>` : '');
+    }).join('') : `<tr><td colspan="10" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
   }
 
   // One line per character: Character, then one quantity box per item on the chosen map.
@@ -1869,6 +2143,7 @@
     const pick = first ? allCharacters()[0] : (allCharacters().find(c => !used.includes(c)) || '');
     return `<div class="top-row drop-line drop-row">
       <label><span class="lbl">Character</span><select class="drop-char" aria-label="Character" data-prev="${esc(pick || '')}">${charOptions(pick)}</select></label>
+      <label class="looter-box"><span class="lbl">Looter</span><input type="checkbox" class="drop-looter" aria-label="Looter" checked></label>
       <span class="drops"></span>
       ${first ? '' : '<button type="button" class="row-del" title="Remove this character" aria-label="Remove this character">&times;</button>'}
     </div>`;
@@ -2022,6 +2297,8 @@
   function addFarmingRun() {
     const duration = $('f-duration') ? $('f-duration').value : '';
     const created = Date.now(), session = newId();
+    const num = id => { const v = parseInt(noCommas(($(id) || {}).value || ''), 10); return v >= 0 ? v : null; };
+    const mages = num('f-mages'), looters = num('f-looters');
     const added = [];
     // Each map is saved as its own run, all sharing one session id (so History lists it under its location).
     mapBlocks().forEach(block => {
@@ -2031,9 +2308,10 @@
       const chars = rows.filter(row => (block.dataset.main && row.querySelector('.drop-char').value.trim()) || [...row.querySelectorAll('.drop-qty')].some(i => i.value !== '')).length;
       rows.forEach(row => {
         const character = row.querySelector('.drop-char').value.trim();
+        const looter = !!(row.querySelector('.drop-looter') || {}).checked;
         row.querySelectorAll('.drop-qty').forEach(i => {
           const qty = parseInt(noCommas(i.value), 10);
-          if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, session, chars, character, location, duration, item: i.dataset.item, qty });
+          if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, session, chars, mages, looters, character, looter, location, duration, item: i.dataset.item, qty });
         });
       });
     });
@@ -2052,6 +2330,24 @@
     render();
   }
   $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-location' || e.target.classList.contains('map-loc')) renderItemSelect(); });
+  // Looter ticked (the default) = this character picks up drops. Unticked = a hitter: no item boxes, and Hitters / Looters are counted from the ticks.
+  function syncLootCounts() {
+    if (!$('f-looters')) return;
+    const boxes = [...document.querySelectorAll('.drop-rows .drop-looter')];
+    $('f-looters').value = boxes.filter(b => b.checked).length;
+    $('f-mages').value = boxes.filter(b => !b.checked).length;
+  }
+  $('entryForm').addEventListener('change', e => {
+    if (!e.target.classList.contains('drop-looter')) return;
+    const row = e.target.closest('.drop-row');
+    row.classList.toggle('no-loot', !e.target.checked);
+    if (!e.target.checked) row.querySelectorAll('.drop-qty').forEach(i => { i.value = ''; });
+    renderDropTotal();
+    syncLootCounts();
+  });
+  $('entryForm').addEventListener('click', e => { if (e.target.closest('.add-char-btn, #addMapBlock, .row-del, .map-del')) setTimeout(syncLootCounts, 0); });
+  // Hitters / Looters stay filled in for the next session.
+  $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-mages' || e.target.id === 'f-looters') lastPick[e.target.id.slice(2)] = e.target.value; });
   // Remember the last Duration picked so it stays chosen when the form is rebuilt.
   $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-duration') { lastPick.duration = e.target.value; renderDropTotal(); } });
 
@@ -2110,10 +2406,15 @@
   $('locItemList').addEventListener('click', async e => {
     const n = e.target.dataset.itemdel;
     const loc = $('locItemsFor').value;
-    if (!n || !loc || !(await ask(`Remove "${n}" from ${loc}?`))) return;
+    if (!n || !loc) return;
+    // Removing an item from a map also deletes its saved drops on that map from History.
+    const hit = e => sameName(e.location || '') === sameName(loc) && sameName(e.item || '') === sameName(n);
+    const count = data.farming.filter(hit).length;
+    if (!(await ask(`Remove "${n}" from ${loc}?` + (count ? ` This also deletes ${count} saved ${count === 1 ? 'drop' : 'drops'} of it from History.` : '')))) return;
     const key = sameName(loc);
     mapItems = { ...mapItems, [key]: (mapItems[key] || []).filter(c => sameName(c) !== sameName(n)) };
     saveLocations();
+    if (count) { data.farming = data.farming.filter(e => !hit(e)); save('farming'); }
     render();
   });
   function renderLocationManager() {
