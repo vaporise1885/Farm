@@ -134,7 +134,7 @@
     .new-row .cell { border-color: var(--border); background: var(--panel); }
     .new-row .cell::placeholder { color: var(--muted); }
     td.w-item { min-width: 160px; }
-    td.w-cat { min-width: 130px; }
+    td.w-cat { min-width: 150px; }
     td.w-cat .sub-sel { display: block; width: 100%; margin-top: 4px; }
     td.w-price { min-width: 100px; }
     td.w-date { min-width: 150px; }
@@ -201,7 +201,7 @@
     .total-row td { font-weight: 700; border-top: 2px solid var(--border); }
     .pending-name { display: inline-block; padding: 7px 9px; }
     .tiers { display: flex; gap: 6px; justify-content: flex-end; }
-    .tiers > * { width: 80px; flex: none; text-align: right; }
+    .tiers > * { width: 76px; flex: none; text-align: right; }
     .tiers input.cell { padding-left: 4px; padding-right: 4px; }
     .ore-name { display: inline-block; padding: 6px 8px; }
   .tier-head td { font-weight: 700; padding-top: 18px; border-bottom: 2px solid var(--hl-border); }
@@ -378,7 +378,7 @@
               <tbody class="edit-only">
                 <tr class="new-row">
                   <td class="w-item"><input class="cell" id="np-item" list="dl-pitem" placeholder="New item" aria-label="New item name"></td>
-                  <td class="w-cat"><select class="cell" id="np-cat" aria-label="New item category"></select></td>
+                  <td class="w-cat"><select class="cell" id="np-cat" aria-label="New item category"></select><select class="cell sub-sel" id="np-sub" aria-label="New item subcategory"><option value="">Subcategory</option><option>Crystal</option><option>Plate</option></select></td>
                   <td class="w-price"><input class="cell num" id="np-price" type="text" inputmode="decimal" autocomplete="off" placeholder="Price" aria-label="New item price"></td>
                   <td class="w-date" id="np-date" title="Set automatically to the day you add the price"></td>
                   <td class="actions"><button type="button" class="primary" id="np-add">Add</button></td>
@@ -656,6 +656,7 @@
             arr = arr.filter(x => x.id !== CAT_DOC);
             categoryList = meta && Array.isArray(meta.list) ? meta.list : null;
             dropCats = meta && meta.drops && typeof meta.drops === 'object' ? meta.drops : {};
+            dropSubs = meta && meta.dropSubs && typeof meta.dropSubs === 'object' ? meta.dropSubs : {};
           }
           // Skip the saved location list from a later version, if one was saved.
           if (col === 'farming') {
@@ -995,6 +996,12 @@
   const DROP_CAT_KEY = 'dropCategories.v1';
   let dropCats = {};
   try { const d = JSON.parse(localStorage.getItem(DROP_CAT_KEY)); if (d && typeof d === 'object') dropCats = d; } catch (e) {}
+  // Subcategory (Crystal / Plate) picked for an ore with no price yet, kept the same way.
+  const DROP_SUB_KEY = 'dropSubcategories.v1';
+  let dropSubs = {};
+  try { const d = JSON.parse(localStorage.getItem(DROP_SUB_KEY)); if (d && typeof d === 'object') dropSubs = d; } catch (e) {}
+  // Gives a newly priced drop the subcategory picked for it earlier.
+  const applyDropSub = p => { const v = p && dropSubs[sameName(p.item)]; if (v && !p.sub) p.sub = v; };
   try { const c = JSON.parse(localStorage.getItem(CAT_KEY)); if (Array.isArray(c)) categoryList = c; } catch (e) {}
   const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 
@@ -1011,14 +1018,14 @@
       try {
         const { doc, writeBatch } = cloud.fs;
         const batch = writeBatch(cloud.db);
-        batch.set(doc(cloud.db, 'prices', CAT_DOC), { id: CAT_DOC, item: CAT_DOC, list: categoryList || allCategories(), drops: dropCats });
+        batch.set(doc(cloud.db, 'prices', CAT_DOC), { id: CAT_DOC, item: CAT_DOC, list: categoryList || allCategories(), drops: dropCats, dropSubs });
         await batch.commit();
       } catch (e) {
         notify(e.code === 'permission-denied' ? "This account isn't allowed to make changes." : 'Could not save online: ' + e.message);
       }
       return;
     }
-    try { localStorage.setItem(CAT_KEY, JSON.stringify(categoryList || allCategories())); localStorage.setItem(DROP_CAT_KEY, JSON.stringify(dropCats)); }
+    try { localStorage.setItem(CAT_KEY, JSON.stringify(categoryList || allCategories())); localStorage.setItem(DROP_CAT_KEY, JSON.stringify(dropCats)); localStorage.setItem(DROP_SUB_KEY, JSON.stringify(dropSubs)); }
     catch (e) { notify('Could not save. Your browser may be blocking storage.'); }
   }
   // Returns the category's name (the existing spelling if it's already there).
@@ -1104,7 +1111,8 @@
       return p.tiers;
     }
     const k = tierKey(p);
-    return k && p.price != null ? { [TIERS[k].main || TIERS[k].cols[0]]: p.price } : {};
+    const set = k ? tierSetOf(p) : null;
+    return set && p.price != null ? { [set.main || set.cols[0]]: p.price } : {};
   }
   // The price other pages use: Ores use their Advanced price; Scrolls use the first filled column.
   function mainPriceOf(p) {
@@ -1130,7 +1138,7 @@
     PINNED_PRICES.concat(tagged, data.farming.map(e => e.item)).forEach(n => {
       if (n && !priceOf(n) && !out.some(o => sameName(o) === sameName(n))) out.push(n);
     });
-    return out.map(n => ({ id: 'drop:' + n, item: n, price: null, updated: '', category: dropCats[sameName(n)] || '', pending: true }));
+    return out.map(n => ({ id: 'drop:' + n, item: n, price: null, updated: '', category: dropCats[sameName(n)] || '', sub: dropSubs[sameName(n)] || undefined, pending: true }));
   }
   const ORE_SUBS = ['Crystal', 'Plate'];
   function renderPrices() {
@@ -1176,13 +1184,13 @@
     // In the Ores section, show names without the word "ore" (stored name is unchanged).
     const shownName = p => tierKey(p) === 'ores' ? (p.item.replace(/\bore\b/gi, ' ').replace(/\s+/g, ' ').trim() || p.item) : p.item;
     // Ores get a Subcategory too: Crystal or Plate (saved as `sub`).
-    const subCell = p => tierKey(p) !== 'ores' ? '' : editable
+    const subCell = p => editable
       ? `<select class="cell sub-sel" data-id="${esc(p.id)}" data-field="sub" aria-label="Subcategory"><option value="">Subcategory</option>${ORE_SUBS.map(o => `<option${p.sub === o ? ' selected' : ''}>${o}</option>`).join('')}</select>`
       : (p.sub ? ` <span class="chip">${esc(p.sub)}</span>` : '');
     const rowHtml = p => {
       if (p.pending) return `<tr class="pending-row" title="Drop from Farming with no price yet">
         <td class="w-item"><span class="pending-name" title="${esc(p.item)}">${esc(shownName(p))}</span></td>
-        <td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}</td>
+        <td class="w-cat">${editable ? `<select class="cell" data-id="${esc(p.id)}" data-field="category" aria-label="Category"><option value="">&mdash;</option>${categoryOptions(p.category)}</select>` : (p.category ? `<span class="chip">${esc(p.category)}</span>` : '')}${subCell(p)}</td>
         <td class="num w-price">${tierKey(p) ? tierInputs(p, editable) : editable ? cell(p, 'price', 'number', 'aria-label="Price" min="0" step="any" placeholder="Set price"') : '&mdash;'}</td>
         <td class="w-date">&mdash;</td>
         <td class="actions"></td>
@@ -1274,14 +1282,23 @@
       if (cellEl) { cellEl.focus(); cellEl.select(); cellEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
       return;
     }
-    upsertPrice(item.replace(/\s+/g, ' '), price, todayStr(), $('np-cat').value.trim());
+    const sub = $('np-sub').value;
+    upsertPrice(item.replace(/\s+/g, ' '), price, todayStr(), sub ? 'Ores' : $('np-cat').value.trim());
+    if (sub) { const np = priceOf(item); np.sub = sub; np.tiers = { [tierSetOf(np).main]: price }; }
     notify(`Added ${item}.`);
     savePrices();
-    $('np-item').value = ''; $('np-price').value = ''; $('np-cat').value = '';
+    $('np-item').value = ''; $('np-price').value = ''; $('np-cat').value = ''; $('np-sub').value = '';
     renderPrices();
     $('np-item').focus();
   }
   $('np-add').addEventListener('click', addNewPrice);
+  // Picking Crystal or Plate makes the new item an Ore.
+  $('np-sub').addEventListener('change', () => {
+    if (!$('np-sub').value) return;
+    const sel = $('np-cat');
+    if (![...sel.options].some(o => o.value === 'Ores')) sel.insertAdjacentHTML('beforeend', '<option value="Ores">Ores</option>');
+    sel.value = 'Ores';
+  });
   let npCatLast = '';
   $('np-cat').addEventListener('focus', () => { npCatLast = $('np-cat').value; });
   $('np-cat').addEventListener('change', async () => {
@@ -1293,7 +1310,7 @@
     npCatLast = sel.value;
     sel.focus();
   });
-  ['np-item', 'np-cat', 'np-price'].forEach(id => $(id).addEventListener('keydown', e => {
+  ['np-item', 'np-cat', 'np-sub', 'np-price'].forEach(id => $(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); addNewPrice(); }
   }));
 
@@ -1309,6 +1326,15 @@
   });
   $('priceBody').addEventListener('change', e => {
     const el = e.target, field = el.dataset.field;
+    if (field === 'sub' && String(el.dataset.id).startsWith('drop:')) {
+      const key = sameName(el.dataset.id.slice(5)), next = { ...dropSubs };
+      if (el.value) next[key] = el.value; else delete next[key];
+      dropSubs = next;
+      if (el.value) dropCats = { ...dropCats, [key]: 'Ores' };
+      saveCategories();
+      setTimeout(renderPrices, 0);
+      return;
+    }
     if (field === 'category' && String(el.dataset.id).startsWith('drop:')) {
       // Category for a drop with no price yet: remember it until a price is entered.
       const name = el.dataset.id.slice(5);
@@ -1331,7 +1357,10 @@
         const name = el.dataset.id.slice(5);
         upsertPrice(name, v, todayStr(), dropCats[sameName(name)] || '');
         p = priceOf(name);
+        applyDropSub(p);
         p.tiers = { [tier]: v };
+        const main = mainPriceOf(p);
+        if (main != null && main !== p.price) upsertPrice(p.item, main, todayStr(), '');
       } else {
         const t = { ...tiersOf(p) };
         if (v == null) delete t[tier]; else t[tier] = v;
@@ -1351,6 +1380,7 @@
       if (!(price >= 0)) { el.value = ''; return; }
       const name = el.dataset.id.slice(5);
       upsertPrice(name, price, todayStr(), dropCats[sameName(name)] || '');
+      applyDropSub(priceOf(name));
       savePrices();
       setTimeout(renderPrices, 0);
       return;
@@ -1373,7 +1403,7 @@
     } else if (field === 'category') {
       p.category = v;
     } else if (field === 'sub') {
-      if (v) p.sub = v; else delete p.sub;
+      if (v) { p.sub = v; p.category = 'Ores'; } else delete p.sub;
       const main = mainPriceOf(p);
       if (main != null && main !== p.price) upsertPrice(p.item, main, todayStr(), '');
     } else if (field === 'price') {
@@ -1816,7 +1846,7 @@
     return ore ? adv / ore : null;
   };
   // Items in the Ores category (from Prices, or the category picked for an unpriced drop).
-  const isOreItem = name => { const p = priceOf(name); return !(p && isPlate(p)) && sameName((p ? p.category : dropCats[sameName(name)]) || '') === sameName('Ores'); };
+  const isOreItem = name => { const p = priceOf(name); return !(p ? isPlate(p) : dropSubs[sameName(name)] === 'Plate') && sameName((p ? p.category : dropCats[sameName(name)]) || '') === sameName('Ores'); };
   // Advanced Ore = Total x Average Craft, for Ores only.
   const advancedOreOf = (name, total) => { const a = avgCraftOf(name); return a == null ? null : total * a; };
   // White Scroll: Ores = (Advanced Ore x latest Price) / latest White Scroll price; everything else = (Total x latest Price) / latest White Scroll price.
