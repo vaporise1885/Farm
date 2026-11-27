@@ -159,6 +159,7 @@
     .drop-total-wrap { padding-top: 12px; border-top: 2px solid var(--hl-border); }
     .sess-map { font-weight: 700; margin: 12px 0 4px; color: var(--hl-border); }
     .sess-map:first-child { margin-top: 0; }
+    .sess-counts { margin-left: 16px; color: var(--text); font-weight: 400; font-size: 0.9rem; }
     .sess-total { margin-top: 12px; padding-top: 10px; border-top: 2px solid var(--hl-border); }
     .drop-row.no-loot .drops { display: none; }
     .blk-counts { margin-left: 12px; }
@@ -375,7 +376,7 @@
           <h2>Session history</h2>
           <div class="table-scroll">
             <table>
-              <thead id="sessionHead"><tr><th>Date</th><th>Maps</th><th>Duration</th><th class="num">Hitters</th><th class="num">Looters</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th></tr></thead>
+              <thead id="sessionHead"><tr><th>Date</th><th>Maps</th><th>Duration</th><th class="num">Hitters</th><th class="num">Looters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th></tr></thead>
               <tbody id="sessionBody"></tbody>
             </table>
           </div>
@@ -845,7 +846,7 @@
     if (current === 'crafting') $('historyHead').innerHTML = `<tr><th>Item</th>${CRAFT_TOTAL_HEADS}<th></th></tr>`;
     if (current === 'farming') {
       // Farming history: one row per run.
-      $('historyHead').innerHTML = `<tr><th>Location / map</th><th>Duration</th><th class="num">Hitters</th><th class="num">Looters</th><th class="num">Characters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th><th></th></tr>`;
+      $('historyHead').innerHTML = `<tr><th>Location / map</th><th>Duration</th><th class="num">Hitters</th><th class="num">Looters</th><th class="nw-th farm-th num">White Scroll (Then)</th><th class="nw-th farm-th num">White Scroll / Hour (Then)</th><th class="nw-th farm-th num yl-div">White Scroll (Now)</th><th class="nw-th farm-th num">White Scroll / Hour (Now)</th><th></th></tr>`;
       $('search').placeholder = 'Search location, character or item';
     }
     $('statValueBox').hidden = current !== 'farming';
@@ -2048,7 +2049,7 @@
       // Whole session: each map's breakdown, then the session added up (Then prices; maps run at the same time, so hours = the Duration).
       const ws = sess.map(x => wsOf(x, x.date)).filter(v => v != null), total = ws.length ? ws.reduce((a, b) => a + b, 0) : null;
       const hrs = durationHours(r.duration);
-      return sess.map(x => `<div class="sess-map">${esc(locationName(x.location) || '(no map)')}</div>` +
+      return sess.map(x => `<div class="sess-map">${esc(locationName(x.location) || '(no map)')}<span class="sess-counts">Hitters <b>${x.mages == null ? '&mdash;' : fmt(x.mages)}</b> · Looters <b>${x.looters == null ? '&mdash;' : fmt(x.looters)}</b></span></div>` +
           totalTableHtml(itemsOfRun(x), i => x.qty[i] || 0, x.date, x.duration)).join('') +
         `<div class="sess-total">Session total (${sess.length} maps${r.duration ? ', ' + esc(r.duration) : ''}): White Scroll (Then) <b>${fmtWs(total)}</b> · White Scroll / Hour (Then) <b>${total == null || !hrs ? '&mdash;' : fmtWs(total / hrs)}</b></div>`;
     };
@@ -2060,13 +2061,12 @@
         <td>${r.duration ? esc(r.duration) : '&mdash;'}</td>
         <td class="num">${r.mages == null ? '&mdash;' : fmt(r.mages)}</td>
         <td class="num">${r.looters == null ? '&mdash;' : fmt(r.looters)}</td>
-        <td class="num">${fmt(charsOf(r))}</td>
         <td class="num">${fmtWs(wsOf(r, r.date))}</td>
         <td class="num">${fmtWs(perHour([r], r.date))}</td>
         <td class="num yl-div">${fmtWs(wsOf(r, null))}</td>
         <td class="num">${fmtWs(perHour([r], null))}</td>
         <td class="nowrap"><button class="link edit-only edit-btn" data-editrun="${esc(r.key)}" title="Edit" aria-label="Edit">&#9998;</button><button class="link edit-only minus-btn" data-delrun="${esc(r.key)}" title="Delete this run" aria-label="Delete this run">&times;</button></td>
-      </tr>` + (open ? `<tr class="run-detail"><td colspan="10">${runDetail(r)}</td></tr>` : '');
+      </tr>` + (open ? `<tr class="run-detail"><td colspan="9">${runDetail(r)}</td></tr>` : '');
     };
     // One row per location / map (A-Z); click it to see each run by date (newest first).
     // Location row: number of runs, total duration, average characters, and average White Scroll per run.
@@ -2080,12 +2080,10 @@
     const fmtMins = t => !t ? '&mdash;' : [Math.floor(t / 60) ? Math.floor(t / 60) + 'h' : '', t % 60 ? (t % 60) + 'mn' : ''].filter(Boolean).join(' ');
     const rows = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })).map(g => {
       const open = openLoc === g.key;
-      const avgChars = avg(g.runs.map(charsOf));
       return `<tr class="loc-row${open ? ' selected' : ''}" data-loc="${esc(g.key)}" title="Click to see each run by date">
         <td>${esc(g.name)} <span class="muted-count">(${g.runs.length})</span></td>
         <td>${fmtMins(g.runs.reduce((t, r) => t + mins(r.duration), 0))}</td>
         <td></td><td></td>
-        <td class="num">${avgChars == null ? '&mdash;' : avgChars.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
         <td class="num">${fmtWs(avg(g.runs.map(r => wsOf(r, r.date))))}</td>
         <td class="num">${fmtWs(perHour(g.runs, 'then'))}</td>
         <td class="num yl-div">${fmtWs(avg(g.runs.map(r => wsOf(r, null))))}</td>
@@ -2093,7 +2091,7 @@
         <td></td>
       </tr>` + (open ? g.runs.map(runRow).join('') : '');
     });
-    $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="10" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
+    $('historyBody').innerHTML = rows.length ? rows.join('') : `<tr><td colspan="9" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
 
     // Session history: one row per Add (all maps saved together), newest first. Runs saved before sessions existed count as their own session.
     const sessions = new Map();
@@ -2113,13 +2111,12 @@
         <td>${r0.duration ? esc(r0.duration) : '&mdash;'}</td>
         <td class="num">${rs.every(r => r.mages == null) ? '&mdash;' : fmt(rs.reduce((t, r) => t + (r.mages || 0), 0))}</td>
         <td class="num">${rs.every(r => r.looters == null) ? '&mdash;' : fmt(rs.reduce((t, r) => t + (r.looters || 0), 0))}</td>
-        <td class="num">${fmt(rs.reduce((t, r) => t + charsOf(r), 0))}</td>
         <td class="num">${fmtWs(then)}</td>
         <td class="num">${then == null || !hrs ? '&mdash;' : fmtWs(then / hrs)}</td>
         <td class="num yl-div">${fmtWs(now)}</td>
         <td class="num">${now == null || !hrs ? '&mdash;' : fmtWs(now / hrs)}</td>
-      </tr>` + (open ? `<tr class="run-detail"><td colspan="10">${runDetail(r0)}</td></tr>` : '');
-    }).join('') : `<tr><td colspan="10" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
+      </tr>` + (open ? `<tr class="run-detail"><td colspan="9">${runDetail(r0)}</td></tr>` : '');
+    }).join('') : `<tr><td colspan="9" class="empty">${esc(TABS.farming.empty)}</td></tr>`;
   }
 
   // One line per character: Character, then one quantity box per item on the chosen map.
