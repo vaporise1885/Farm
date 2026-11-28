@@ -163,6 +163,10 @@
     .sess-total { margin-top: 12px; padding-top: 10px; border-top: 2px solid var(--hl-border); }
     .drop-row.no-loot .drops { display: none; }
     .blk-counts { margin-left: 12px; }
+    .char-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .preset-tools { display: inline-flex; align-items: center; gap: 8px; }
+    .preset-tools .preset-sel { width: auto; min-width: 170px; }
+    .preset-tools .preset-save { color: var(--accent); font-weight: 600; }
     .looter-box { width: 46px !important; display: flex; flex-direction: column; align-items: center; }
     .looter-box input { width: 18px; height: 18px; margin: 11px 0; accent-color: var(--hl-border); }
     .top-row label.chars-box { width: 90px; }
@@ -255,7 +259,9 @@
     .modal p { margin: 0 0 18px; }
     .modal-input { margin: -6px 0 18px; }
     .modal .row { display: flex; justify-content: flex-end; gap: 10px; }
-    .edit-modal { max-width: 760px; max-height: 88vh; overflow: auto; }
+    .edit-modal .ed-grid.no-loot .ed-q { display: none; }
+    .edit-modal .ed-del { border: none; background: none; color: var(--danger); font-size: 1.4rem; line-height: 1; padding: 8px 10px; }
+    .edit-modal { max-width: 1100px; max-height: 88vh; overflow: auto; }
     .edit-modal h3 { margin: 0 0 14px; }
     .edit-modal .ed-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
     .edit-modal .ed-row label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); width: 150px; }
@@ -737,6 +743,8 @@
             mapItems = meta && meta.items && typeof meta.items === 'object' ? meta.items : {};
             characterList = meta && Array.isArray(meta.characters) ? meta.characters : null;
             jobList = meta && Array.isArray(meta.jobs) ? meta.jobs : [];
+            presetList = meta && Array.isArray(meta.presets) ? meta.presets : [];
+            refreshPresetSelects();
             charJobs = meta && meta.charJobs && typeof meta.charJobs === 'object' ? meta.charJobs : {};
             refreshCharSelects();
           }
@@ -821,7 +829,7 @@
       `<span class="spacer"></span></div>` +
       (current === 'farming'
         ? `<div class="full map-block" data-main="1"><div class="drop-rows" id="dropRows">${dropRowHtml(true)}</div>` +
-          `<div><button type="button" class="add-char add-char-btn" id="addCharRow">+ Add character</button></div>` +
+          `<div class="char-tools"><button type="button" class="add-char add-char-btn" id="addCharRow">+ Add character</button><span class="preset-tools"><select class="preset-sel" aria-label="Character preset"></select><button type="button" class="link preset-save">Save as preset</button><button type="button" class="link minus-btn preset-del" title="Delete the chosen preset" aria-label="Delete the chosen preset">&times;</button></span></div>` +
           `<div class="drop-total-wrap"><div class="drop-total farm-total" id="dropTotal"></div></div></div><datalist id="dl-character"></datalist>` +
           `<div class="full" id="extraMaps"></div>` +
           `<div class="full drop-actions"><button type="button" class="add-char" id="addMapBlock">+ Add another map</button><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
@@ -837,6 +845,7 @@
         `<label class="chars-box">Hitters<input type="text" inputmode="numeric" autocomplete="off" id="f-mages" placeholder="0" readonly tabindex="-1" class="auto-date" title="All maps added up, from the Looter ticks" aria-label="Number of hitters"></label>` +
         `<label class="chars-box">Looters<input type="text" inputmode="numeric" autocomplete="off" id="f-looters" placeholder="0" readonly tabindex="-1" class="auto-date" title="All maps added up, from the Looter ticks" aria-label="Number of looters"></label>`);
       syncLootCounts();
+      refreshPresetSelects();
     }
 
     const textFields = cfg.fields.filter(f => f.type !== 'number');
@@ -1628,19 +1637,23 @@
     const es = data.farming.filter(x => (x.run || x.id) === key).sort((a, b) => (a.created || 0) - (b.created || 0));
     if (!es.length) return;
     const f = es[0];
-    // One line per character in the run, plus one empty line to add someone.
+    // One line per looter in the run (anyone with drops), then the saved hitters (unticked, no item boxes), then one empty line.
     const lines = [];
     es.forEach(x => {
       let l = lines.find(y => y.character === (x.character || ''));
-      if (!l) { l = { character: x.character || '', looter: !!x.looter, qty: {} }; lines.push(l); }
+      if (!l) { l = { character: x.character || '', looter: true, qty: {} }; lines.push(l); }
       l.qty[x.item] = (l.qty[x.item] || 0) + (x.qty || 0);
     });
-    lines.push({ character: '', qty: {} });
+    if (Array.isArray(f.hitters)) f.hitters.forEach(h => lines.push({ character: h, looter: false, qty: {} }));
+    else for (let i = 0; i < (f.mages || 0); i++) lines.push({ character: '', looter: false, qty: {} });   // older runs: count only, no names
+    lines.push({ character: '', looter: true, qty: {} });
     const gridHtml = loc => {
       const items = [...new Set([...itemsOn(loc), ...es.map(x => x.item)])];
-      return lines.map((l, i) => `<div class="ed-row ed-grid" data-line="${i}"><label>Character<select class="ed-char"><option value="">&mdash;</option>${optionList(allCharacters(), l.character)}</select></label>` +
+      return lines.map((l, i) => `<div class="ed-row ed-grid${l.looter ? '' : ' no-loot'}" data-line="${i}"><label>Character<select class="ed-char"><option value="">&mdash;</option>${optionList(allCharacters(), l.character)}</select></label>` +
         `<label class="looter-box">Looter<input type="checkbox" class="ed-looter"${l.looter ? ' checked' : ''}></label>` +
-        items.map(it => `<label>${esc(it)}<input type="text" inputmode="decimal" autocomplete="off" class="ed-qty" data-item="${esc(it)}" value="${esc(l.qty[it] ? withCommas(l.qty[it]) : '')}" placeholder="0"></label>`).join('') + '</div>').join('');
+        items.map(it => `<label class="ed-q">${esc(it)}<input type="text" inputmode="decimal" autocomplete="off" class="ed-qty" data-item="${esc(it)}" value="${esc(l.qty[it] ? withCommas(l.qty[it]) : '')}" placeholder="0"></label>`).join('') +
+        `<button type="button" class="row-del ed-del" title="Remove this character from the run" aria-label="Remove this character from the run">&times;</button></div>`).join('') +
+        `<button type="button" class="add-char" id="ed-addline">+ Add character</button>`;
     };
     // Keep what was typed when the map changes.
     const readGrid = () => $('editBody').querySelectorAll('.ed-grid').forEach(row => {
@@ -1649,28 +1662,59 @@
       l.looter = row.querySelector('.ed-looter').checked;
       row.querySelectorAll('.ed-qty').forEach(i => { const v = edNum(i.value); if (v) l.qty[i.dataset.item] = v; else delete l.qty[i.dataset.item]; });
     });
+    // Hitters = unticked lines; Looters = ticked lines that have a character or a number. Counted as you edit.
+    const counts = () => ({
+      hitters: lines.filter(l => !l.looter).length,
+      looters: lines.filter(l => l.looter && (l.character || Object.keys(l.qty).length)).length
+    });
+    const showCounts = () => { readGrid(); const c = counts(); $('ed-mages').value = c.hitters; $('ed-looters').value = c.looters; };
     openEditor(`Edit run: ${locationName(f.location) || '(no map)'}`, `<div class="ed-row"><label>Date<input type="date" id="ed-date" value="${esc(f.date)}"></label>
       <label>Location / map<select id="ed-loc">${optionList(allLocations(), locationName(f.location) || f.location || '')}</select></label>
       <label class="ed-narrow">Duration<select id="ed-dur"><option value="">&mdash;</option>${optionList(DURATIONS, f.duration || '')}</select></label>
-      ${numBox('ed-mages', 'Hitters', f.mages, 'ed-narrow')}${numBox('ed-looters', 'Looters', f.looters, 'ed-narrow')}${numBox('ed-chars', 'Characters', f.chars, 'ed-narrow')}</div>
+      <label class="ed-narrow">Hitters<input type="text" id="ed-mages" readonly tabindex="-1" title="Counted from the Looter ticks"></label>
+      <label class="ed-narrow">Looters<input type="text" id="ed-looters" readonly tabindex="-1" title="Counted from the Looter ticks"></label></div>
       <div id="ed-grid">${gridHtml(f.location)}</div>`, () => {
       readGrid();
       if (!edVal('ed-date')) { notify('Enter a date.'); return false; }
       const location = edVal('ed-loc'), duration = edVal('ed-dur'), date = edVal('ed-date');
-      const opt = id => { const v = edVal(id).trim(); return v === '' ? null : edNum(v); };
-      const chars = opt('ed-chars') || lines.filter(l => l.character || Object.keys(l.qty).length).length;
-      const base = { run: f.run || key, session: f.session || '', chars, mages: opt('ed-mages'), looters: opt('ed-looters'), location, duration, date };
+      const c = counts();
+      const hitters = lines.filter(l => !l.looter && l.character).map(l => l.character);
+      const base = { run: f.run || key, session: f.session || '', chars: c.hitters + c.looters, mages: c.hitters, looters: c.looters, hitters, location, duration, date };
       const added = [];
-      lines.forEach(l => Object.entries(l.qty).forEach(([item, qty]) => {
-        if (qty > 0) added.push({ id: newId(), created: (f.created || Date.now()) + added.length, ...base, character: l.character, looter: !!l.looter, item, qty });
-      }));
+      lines.forEach(l => { if (l.looter) Object.entries(l.qty).forEach(([item, qty]) => {
+        if (qty > 0) added.push({ id: newId(), created: (f.created || Date.now()) + added.length, ...base, character: l.character, looter: true, item, qty });
+      }); });
       if (!added.length) { notify('Enter a quantity for at least one item, or delete the run instead.'); return false; }
-      if (!base.session) delete base.session;
       added.forEach(a => { if (!a.session) delete a.session; });
       data.farming = data.farming.filter(x => (x.run || x.id) !== key).concat(added);
       save('farming'); render();
     });
-    $('ed-loc').addEventListener('change', () => { readGrid(); $('ed-grid').innerHTML = gridHtml($('ed-loc').value); });
+    showCounts();
+    $('ed-loc').addEventListener('change', () => { readGrid(); $('ed-grid').innerHTML = gridHtml($('ed-loc').value); showCounts(); });
+    $('ed-grid').addEventListener('change', e => {
+      if (e.target.classList.contains('ed-looter')) {
+        const row = e.target.closest('.ed-grid');
+        row.classList.toggle('no-loot', !e.target.checked);
+        if (!e.target.checked) row.querySelectorAll('.ed-qty').forEach(i => { i.value = ''; });
+      }
+      showCounts();
+    });
+    $('ed-grid').addEventListener('input', showCounts);
+    $('ed-grid').addEventListener('click', e => {
+      if (e.target.classList.contains('ed-del')) {
+        // Remove this character (and their drops) from the run.
+        readGrid();
+        lines.splice(+e.target.closest('.ed-grid').dataset.line, 1);
+        $('ed-grid').innerHTML = gridHtml($('ed-loc').value);
+        showCounts();
+        return;
+      }
+      if (e.target.id !== 'ed-addline') return;
+      readGrid();
+      lines.push({ character: '', looter: true, qty: {} });
+      $('ed-grid').innerHTML = gridHtml($('ed-loc').value);
+      showCounts();
+    });
   }
   $('historyBody').addEventListener('click', e => {
     const b = e.target.closest('.edit-btn');
@@ -1702,6 +1746,10 @@
   // Jobs: a list managed on the Characters page, and each character's job (keyed by name, capitals/spaces ignored).
   const JOBS_KEY = 'charJobs.v1';
   let jobList = [], charJobs = {};
+  // Character presets for the Drop Table: a named list of character lines (who, and whether they loot).
+  const PRESET_KEY = 'charPresets.v1';
+  let presetList = [];
+  try { const pr = JSON.parse(localStorage.getItem(PRESET_KEY)); if (Array.isArray(pr)) presetList = pr; } catch (e) {}
   try { const j = JSON.parse(localStorage.getItem(JOBS_KEY)); if (j && Array.isArray(j.jobs)) { jobList = j.jobs; charJobs = j.charJobs || {}; } } catch (e) {}
   try { const m = JSON.parse(localStorage.getItem(MAP_ITEMS_KEY)); if (m && typeof m === 'object') mapItems = m; } catch (e) {}
   // A to Z, except Mesos always comes first.
@@ -1807,14 +1855,14 @@
       try {
         const { doc, writeBatch } = cloud.fs;
         const batch = writeBatch(cloud.db);
-        batch.set(doc(cloud.db, 'farming', LOC_DOC), { id: LOC_DOC, item: LOC_DOC, list: locationList || allLocations(), items: mapItems, characters: allCharacters(), jobs: jobList, charJobs });
+        batch.set(doc(cloud.db, 'farming', LOC_DOC), { id: LOC_DOC, item: LOC_DOC, list: locationList || allLocations(), items: mapItems, characters: allCharacters(), jobs: jobList, charJobs, presets: presetList });
         await batch.commit();
       } catch (e) {
         notify(e.code === 'permission-denied' ? "This account isn't allowed to make changes." : 'Could not save online: ' + e.message);
       }
       return;
     }
-    try { localStorage.setItem(LOC_KEY, JSON.stringify(locationList || allLocations())); localStorage.setItem(MAP_ITEMS_KEY, JSON.stringify(mapItems)); localStorage.setItem(CHAR_KEY, JSON.stringify(allCharacters())); localStorage.setItem(JOBS_KEY, JSON.stringify({ jobs: jobList, charJobs })); }
+    try { localStorage.setItem(LOC_KEY, JSON.stringify(locationList || allLocations())); localStorage.setItem(MAP_ITEMS_KEY, JSON.stringify(mapItems)); localStorage.setItem(CHAR_KEY, JSON.stringify(allCharacters())); localStorage.setItem(JOBS_KEY, JSON.stringify({ jobs: jobList, charJobs })); localStorage.setItem(PRESET_KEY, JSON.stringify(presetList)); }
     catch (e) { notify('Could not save. Your browser may be blocking storage.'); }
   }
   function addLocation(name) {
@@ -2272,11 +2320,12 @@
         <div class="top-row map-head"><label>Location / map<select class="map-loc" aria-label="Location / map">${$('f-location').innerHTML}</select></label>
           <button type="button" class="row-del map-del" title="Remove this map" aria-label="Remove this map">&times;</button></div>
         <div class="drop-rows">${dropRowHtml(false)}</div>
-        <div><button type="button" class="add-char add-char-btn">+ Add character</button></div>
+        <div class="char-tools"><button type="button" class="add-char add-char-btn">+ Add character</button><span class="preset-tools"><select class="preset-sel" aria-label="Character preset"></select><button type="button" class="link preset-save">Save as preset</button><button type="button" class="link minus-btn preset-del" title="Delete the chosen preset" aria-label="Delete the chosen preset">&times;</button></span></div>
         <div class="drop-total-wrap"><div class="drop-total farm-total"></div></div></div>`);
       const block = $('extraMaps').lastElementChild;
       block.querySelector('.map-loc').value = pick;
       block.querySelector('.drop-rows .row-del').remove();   // a map always keeps at least one line
+      refreshPresetSelects();
       renderItemSelect();
       block.querySelector('.map-loc').focus();
     } else if (e.target.classList.contains('map-del')) {
@@ -2303,12 +2352,13 @@
       // Each map keeps its own counts: Looters = ticked lines, Hitters = unticked lines, Characters = both.
       const looters = rows.filter(r => r.querySelector('.drop-looter').checked).length;
       const mages = rows.length - looters, chars = rows.length;
+      const hitters = rows.filter(r => !r.querySelector('.drop-looter').checked).map(r => r.querySelector('.drop-char').value.trim()).filter(Boolean);
       rows.forEach(row => {
         const character = row.querySelector('.drop-char').value.trim();
         const looter = !!(row.querySelector('.drop-looter') || {}).checked;
         row.querySelectorAll('.drop-qty').forEach(i => {
           const qty = parseInt(noCommas(i.value), 10);
-          if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, session, chars, mages, looters, character, looter, location, duration, item: i.dataset.item, qty });
+          if (qty > 0) added.push({ id: newId(), date: todayStr(), created: created + added.length, run, session, chars, mages, looters, hitters, character, looter, location, duration, item: i.dataset.item, qty });
         });
       });
     });
@@ -2328,6 +2378,63 @@
   }
   $('entryForm').addEventListener('change', e => { if (e.target.id === 'f-location' || e.target.classList.contains('map-loc')) renderItemSelect(); });
   // Looter ticked (the default) = this character picks up drops. Unticked = a hitter: no item boxes, and Hitters / Looters are counted from the ticks.
+  function refreshPresetSelects() {
+    document.querySelectorAll('.preset-sel').forEach(sel => {
+      sel.innerHTML = '<option value="">Load preset...</option>' + presetList.map((pr, i) => `<option value="${i}">${esc(pr.name)} (${pr.lines.length})</option>`).join('');
+    });
+  }
+  // Replace a map's character lines with a preset's.
+  function applyPreset(block, pr) {
+    const rows = block.querySelector('.drop-rows');
+    rows.innerHTML = '';
+    pr.lines.forEach((l, i) => {
+      rows.insertAdjacentHTML('beforeend', dropRowHtml(i === 0 && !!block.dataset.main));
+      const row = rows.lastElementChild;
+      if (i === 0 && !block.dataset.main) { const d = row.querySelector('.row-del'); if (d) d.remove(); }
+      const sel = row.querySelector('.drop-char');
+      if (l.character && !allCharacters().includes(l.character)) { characterList = allCharacters().concat(l.character); }
+      sel.innerHTML = charOptions(l.character); sel.value = l.character || ''; sel.dataset.prev = sel.value;
+      const tick = row.querySelector('.drop-looter');
+      tick.checked = l.looter !== false;
+      row.classList.toggle('no-loot', !tick.checked);
+    });
+    renderItemSelect();
+    syncLootCounts();
+  }
+  $('entryForm').addEventListener('change', e => {
+    if (!e.target.classList.contains('preset-sel') || e.target.value === '') return;
+    const pr = presetList[+e.target.value];
+    const block = e.target.closest('.map-block');
+    e.target.value = '';
+    if (pr) { applyPreset(block, pr); notify(`Loaded preset ${pr.name}.`); }
+  });
+  $('entryForm').addEventListener('click', async e => {
+    const block = e.target.closest('.map-block');
+    if (e.target.classList.contains('preset-save')) {
+      const lines = [...block.querySelectorAll('.drop-row')].map(r => ({ character: r.querySelector('.drop-char').value, looter: r.querySelector('.drop-looter').checked }));
+      const name = String(await askText('Name this preset (e.g. Wolf Spider team)', 'Save') || '').trim().replace(/\s+/g, ' ');
+      if (!name) return;
+      const at = presetList.findIndex(pr => sameName(pr.name) === sameName(name));
+      const next = presetList.slice();
+      if (at >= 0) next[at] = { name: presetList[at].name, lines }; else next.push({ name, lines });
+      presetList = next;
+      saveLocations();
+      refreshPresetSelects();
+      notify(at >= 0 ? `Updated preset ${presetList[at].name}.` : `Saved preset ${name}.`);
+    } else if (e.target.classList.contains('preset-del')) {
+      if (!presetList.length) { notify('No presets yet. Save one first.'); return; }
+      const names = presetList.map((pr, i) => `${i + 1}. ${pr.name}`).join(', ');
+      const pick = String(await askText(`Delete which preset? Type its name (${names})`, 'Delete') || '').trim();
+      if (!pick) return;
+      const at = presetList.findIndex((pr, i) => sameName(pr.name) === sameName(pick) || String(i + 1) === pick);
+      if (at < 0) { notify(`No preset called ${pick}.`); return; }
+      const gone = presetList[at].name;
+      presetList = presetList.filter((_, i) => i !== at);
+      saveLocations();
+      refreshPresetSelects();
+      notify(`Deleted preset ${gone}.`);
+    }
+  });
   // The boxes at the top show the whole session (all maps added up); each map shows its own counts under its lines.
   function syncLootCounts() {
     if (!$('f-looters')) return;
@@ -2337,7 +2444,7 @@
     mapBlocks().forEach(block => {
       const bx = [...block.querySelectorAll('.drop-looter')], l = bx.filter(b => b.checked).length;
       let el = block.querySelector('.blk-counts');
-      if (!el) { el = document.createElement('span'); el.className = 'blk-counts muted-count'; block.querySelector('.add-char-btn').after(el); }
+      if (!el) { el = document.createElement('span'); el.className = 'blk-counts muted-count'; block.querySelector('.char-tools').append(el); }
       el.textContent = `This map: ${bx.length - l} hitter${bx.length - l === 1 ? '' : 's'}, ${l} looter${l === 1 ? '' : 's'}`;
     });
   }
