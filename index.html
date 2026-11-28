@@ -165,7 +165,8 @@
     .blk-counts { margin-left: 12px; }
     .char-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
     .preset-tools { display: inline-flex; align-items: center; gap: 8px; }
-    .preset-tools .preset-sel { width: auto; min-width: 170px; }
+    .top-row label.preset-box { width: 180px; }
+    .top-row label.dur-box { width: 110px; }
     .preset-tools .preset-save { color: var(--accent); font-weight: 600; }
     .looter-box { width: 46px !important; display: flex; flex-direction: column; align-items: center; }
     .looter-box input { width: 18px; height: 18px; margin: 11px 0; accent-color: var(--hl-border); }
@@ -829,7 +830,7 @@
       `<span class="spacer"></span></div>` +
       (current === 'farming'
         ? `<div class="full map-block" data-main="1"><div class="drop-rows" id="dropRows">${dropRowHtml(true)}</div>` +
-          `<div class="char-tools"><button type="button" class="add-char add-char-btn" id="addCharRow">+ Add character</button><span class="preset-tools"><select class="preset-sel" aria-label="Character preset"></select><button type="button" class="link preset-save">Save as preset</button><button type="button" class="link minus-btn preset-del" title="Delete the chosen preset" aria-label="Delete the chosen preset">&times;</button></span></div>` +
+          `<div class="char-tools"><button type="button" class="add-char add-char-btn" id="addCharRow">+ Add character</button><span class="preset-tools"><button type="button" class="link preset-save">Save as preset</button><button type="button" class="link minus-btn preset-del" title="Delete the chosen preset" aria-label="Delete the chosen preset">&times;</button></span></div>` +
           `<div class="drop-total-wrap"><div class="drop-total farm-total" id="dropTotal"></div></div></div><datalist id="dl-character"></datalist>` +
           `<div class="full" id="extraMaps"></div>` +
           `<div class="full drop-actions"><button type="button" class="add-char" id="addMapBlock">+ Add another map</button><span class="spacer"></span><button type="button" class="primary" data-submit>Add</button></div>`
@@ -841,6 +842,8 @@
     // Farming starts with 5 character lines. Mages and Looters boxes sit beside Duration (saved with the session).
     if (current === 'farming') {
       for (let i = 1; i < 5; i++) $('dropRows').insertAdjacentHTML('beforeend', dropRowHtml(false));
+      $('f-duration').closest('label').classList.add('dur-box');
+      $('f-location').closest('label').insertAdjacentHTML('afterend', `<label class="preset-box">Preset<select class="preset-sel" aria-label="Character preset"></select></label>`);
       $('f-duration').closest('label').insertAdjacentHTML('afterend',
         `<label class="chars-box">Hitters<input type="text" inputmode="numeric" autocomplete="off" id="f-mages" placeholder="0" readonly tabindex="-1" class="auto-date" title="All maps added up, from the Looter ticks" aria-label="Number of hitters"></label>` +
         `<label class="chars-box">Looters<input type="text" inputmode="numeric" autocomplete="off" id="f-looters" placeholder="0" readonly tabindex="-1" class="auto-date" title="All maps added up, from the Looter ticks" aria-label="Number of looters"></label>`);
@@ -2318,9 +2321,10 @@
       const pick = locs.find(l => !usedLocs.some(u => sameName(u) === sameName(l))) || locs[0] || '';
       $('extraMaps').insertAdjacentHTML('beforeend', `<div class="map-block extra-map">
         <div class="top-row map-head"><label>Location / map<select class="map-loc" aria-label="Location / map">${$('f-location').innerHTML}</select></label>
+          <label class="preset-box">Preset<select class="preset-sel" aria-label="Character preset"></select></label>
           <button type="button" class="row-del map-del" title="Remove this map" aria-label="Remove this map">&times;</button></div>
         <div class="drop-rows">${dropRowHtml(false)}</div>
-        <div class="char-tools"><button type="button" class="add-char add-char-btn">+ Add character</button><span class="preset-tools"><select class="preset-sel" aria-label="Character preset"></select><button type="button" class="link preset-save">Save as preset</button><button type="button" class="link minus-btn preset-del" title="Delete the chosen preset" aria-label="Delete the chosen preset">&times;</button></span></div>
+        <div class="char-tools"><button type="button" class="add-char add-char-btn">+ Add character</button><span class="preset-tools"><button type="button" class="link preset-save">Save as preset</button><button type="button" class="link minus-btn preset-del" title="Delete the chosen preset" aria-label="Delete the chosen preset">&times;</button></span></div>
         <div class="drop-total-wrap"><div class="drop-total farm-total"></div></div></div>`);
       const block = $('extraMaps').lastElementChild;
       block.querySelector('.map-loc').value = pick;
@@ -2404,7 +2408,8 @@
   $('entryForm').addEventListener('change', e => {
     if (!e.target.classList.contains('preset-sel') || e.target.value === '') return;
     const pr = presetList[+e.target.value];
-    const block = e.target.closest('.map-block');
+    // The top-row Preset box belongs to the first map; each extra map has its own beside its Location.
+    const block = e.target.closest('.map-block') || document.querySelector('.map-block[data-main]');
     e.target.value = '';
     if (pr) { applyPreset(block, pr); notify(`Loaded preset ${pr.name}.`); }
   });
